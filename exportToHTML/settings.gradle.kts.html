@@ -1,0 +1,42 @@
+<html>
+<head>
+<title>settings.gradle.kts</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #080808;}
+.s1 { color: #067d17;}
+.s2 { color: #0037a6;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+settings.gradle.kts</font>
+</center></td></tr></table>
+<pre><span class="s0">pluginManagement {</span>
+    <span class="s0">repositories {</span>
+        <span class="s0">google {</span>
+            <span class="s0">content {</span>
+                <span class="s0">includeGroupByRegex(</span><span class="s1">&quot;com</span><span class="s2">\\</span><span class="s1">.android.*&quot;</span><span class="s0">)</span>
+                <span class="s0">includeGroupByRegex(</span><span class="s1">&quot;com</span><span class="s2">\\</span><span class="s1">.google.*&quot;</span><span class="s0">)</span>
+                <span class="s0">includeGroupByRegex(</span><span class="s1">&quot;androidx.*&quot;</span><span class="s0">)</span>
+            <span class="s0">}</span>
+        <span class="s0">}</span>
+        <span class="s0">mavenCentral()</span>
+        <span class="s0">gradlePluginPortal()</span>
+    <span class="s0">}</span>
+<span class="s0">}</span>
+<span class="s0">dependencyResolutionManagement {</span>
+    <span class="s0">repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)</span>
+    <span class="s0">repositories {</span>
+        <span class="s0">google()</span>
+        <span class="s0">mavenCentral()</span>
+    <span class="s0">}</span>
+<span class="s0">}</span>
+
+<span class="s0">rootProject.name = </span><span class="s1">&quot;Class Cash&quot;</span>
+<span class="s0">include(</span><span class="s1">&quot;:app&quot;</span><span class="s0">)</span>
+ </pre>
+</body>
+</html>

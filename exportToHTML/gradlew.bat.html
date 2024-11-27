@@ -1,0 +1,114 @@
+<html>
+<head>
+<title>gradlew.bat</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #0033b3;}
+.s1 { color: #0033b3; font-style: italic;}
+.s2 { color: #080808;}
+.s3 { color: #8c8c8c; font-style: italic;}
+.s4 { color: #067d17;}
+.s5 { color: #000000;}
+.s6 { color: #0037a6; font-style: italic;}
+.s7 { color: #871094; font-style: italic;}
+.s8 { color: #1750eb; font-style: italic;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+gradlew.bat</font>
+</center></td></tr></table>
+<pre><span class="s0">@</span><span class="s1">rem</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Copyright 2015 the original author or authors.</span>
+<span class="s0">@</span><span class="s1">rem</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">you may not use this file except in compliance with the License.</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">You may obtain a copy of the License at</span>
+<span class="s0">@</span><span class="s1">rem</span>
+<span class="s0">@</span><span class="s1">rem      </span><span class="s3">https://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="s0">@</span><span class="s1">rem</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Unless required by applicable law or agreed to in writing, software</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">See the License for the specific language governing permissions and</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">limitations under the License.</span>
+<span class="s0">@</span><span class="s1">rem</span>
+
+<span class="s0">@</span><span class="s2">if </span><span class="s4">&quot;</span>%DEBUG%<span class="s4">&quot; </span><span class="s0">== </span><span class="s4">&quot;&quot; </span><span class="s0">@echo off</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">##########################################################################</span>
+<span class="s0">@</span><span class="s1">rem</span>
+<span class="s0">@</span><span class="s1">rem  </span><span class="s3">Gradle startup script for Windows</span>
+<span class="s0">@</span><span class="s1">rem</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">##########################################################################</span>
+
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Set local scope for the variables with windows NT shell</span>
+<span class="s0">if </span><span class="s4">&quot;</span>%OS%<span class="s4">&quot;</span><span class="s0">==</span><span class="s4">&quot;Windows_NT&quot; </span><span class="s0">setlocal</span>
+
+<span class="s0">set </span>DIRNAME<span class="s0">=</span>%~dp0
+<span class="s0">if </span><span class="s4">&quot;</span>%DIRNAME%<span class="s4">&quot; </span><span class="s0">== </span><span class="s4">&quot;&quot; </span><span class="s0">set </span>DIRNAME<span class="s0">=</span><span class="s2">. 
+</span><span class="s0">set </span>APP_BASE_NAME<span class="s0">=</span>%~n0
+<span class="s0">set </span>APP_HOME<span class="s0">=</span>%DIRNAME%
+
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Resolve any &quot;.&quot; and &quot;..&quot; in APP_HOME to make it shorter.</span>
+<span class="s0">for </span>%%i <span class="s0">in </span><span class="s2">(</span><span class="s4">&quot;</span>%APP_HOME%<span class="s4">&quot;</span><span class="s2">) </span><span class="s0">do set </span>APP_HOME<span class="s0">=</span><span class="s6">%%</span><span class="s2">~fi</span>
+
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.</span>
+<span class="s0">set </span>DEFAULT_JVM_OPTS<span class="s0">=</span><span class="s4">&quot;-Xmx64m&quot; &quot;-Xms64m&quot;</span>
+
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Find java.exe</span>
+<span class="s0">if defined </span><span class="s2">JAVA_HOME </span><span class="s0">goto </span><span class="s2">findJavaFromJavaHome 
+</span>
+<span class="s0">set </span>JAVA_EXE<span class="s0">=</span><span class="s2">java.exe 
+</span>%JAVA_EXE% <span class="s2">-version </span><span class="s0">&gt;</span><span class="s7">NUL </span><span class="s8">2</span><span class="s0">&gt;&amp;</span><span class="s2">1 
+</span><span class="s0">if </span><span class="s4">&quot;</span>%ERRORLEVEL%<span class="s4">&quot; </span><span class="s0">== </span><span class="s4">&quot;0&quot; </span><span class="s0">goto </span><span class="s2">execute 
+</span>
+<span class="s0">echo</span><span class="s2">. 
+</span><span class="s0">echo </span><span class="s2">ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH. 
+</span><span class="s0">echo</span><span class="s2">. 
+</span><span class="s0">echo </span><span class="s2">Please set the JAVA_HOME variable in your environment to match the 
+</span><span class="s0">echo </span><span class="s2">location of your Java installation. 
+</span>
+<span class="s0">goto </span><span class="s2">fail 
+</span>
+<span class="s2">:</span><span class="s0">findJavaFromJavaHome</span>
+<span class="s0">set </span>JAVA_HOME<span class="s0">=</span>%JAVA_HOME:<span class="s4">&quot;</span>=%
+<span class="s0">set </span>JAVA_EXE<span class="s0">=</span>%JAVA_HOME%<span class="s2">/bin/java.exe 
+</span>
+<span class="s0">if exist </span><span class="s4">&quot;</span>%JAVA_EXE%<span class="s4">&quot; </span><span class="s0">goto </span><span class="s2">execute 
+</span>
+<span class="s0">echo</span><span class="s2">. 
+</span><span class="s0">echo </span><span class="s2">ERROR: JAVA_HOME is set to an invalid directory: </span>%JAVA_HOME%
+<span class="s0">echo</span><span class="s2">. 
+</span><span class="s0">echo </span><span class="s2">Please set the JAVA_HOME variable in your environment to match the 
+</span><span class="s0">echo </span><span class="s2">location of your Java installation. 
+</span>
+<span class="s0">goto </span><span class="s2">fail 
+</span>
+<span class="s2">:</span><span class="s0">execute</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Setup the command line</span>
+
+<span class="s0">set </span>CLASSPATH<span class="s0">=</span>%APP_HOME%<span class="s2">\gradle\wrapper\gradle-wrapper.jar 
+</span>
+
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">Execute Gradle</span>
+<span class="s4">&quot;</span>%JAVA_EXE%<span class="s4">&quot; </span>%DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% <span class="s4">&quot;-Dorg.gradle.appname=</span>%APP_BASE_NAME%<span class="s4">&quot; </span><span class="s2">-classpath </span><span class="s4">&quot;</span>%CLASSPATH%<span class="s4">&quot; </span><span class="s2">org.gradle.wrapper.GradleWrapperMain </span>%*
+
+<span class="s2">:</span><span class="s0">end</span>
+<span class="s0">@</span><span class="s1">rem </span><span class="s3">End local scope for the variables with windows NT shell</span>
+<span class="s0">if </span><span class="s4">&quot;</span>%ERRORLEVEL%<span class="s4">&quot;</span><span class="s0">==</span><span class="s4">&quot;0&quot; </span><span class="s0">goto </span><span class="s2">mainEnd 
+</span>
+<span class="s2">:</span><span class="s0">fail</span>
+<span class="s1">rem </span><span class="s3">Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of</span>
+<span class="s1">rem </span><span class="s3">the _cmd.exe /c_ return code!</span>
+<span class="s0">if  not </span><span class="s4">&quot;&quot; </span><span class="s0">== </span><span class="s4">&quot;</span>%GRADLE_EXIT_CONSOLE%<span class="s4">&quot; </span><span class="s0">exit </span><span class="s8">1</span>
+<span class="s0">exit </span><span class="s2">/b </span><span class="s8">1</span>
+
+<span class="s2">:</span><span class="s0">mainEnd</span>
+<span class="s0">if </span><span class="s4">&quot;</span>%OS%<span class="s4">&quot;</span><span class="s0">==</span><span class="s4">&quot;Windows_NT&quot; </span><span class="s0">endlocal</span>
+
+<span class="s2">:</span><span class="s0">omega</span>
+</pre>
+</body>
+</html>

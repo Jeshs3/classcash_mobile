@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "436325517951",
+    "project_id": "classcash-23d04",
+    "storage_bucket": "classcash-23d04.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:436325517951:android:f94e800707002ed2de4d4a",
+        "android_client_info": {
+          "package_name": "com.example.classcash"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDonp_N7tx3d5u6KIHdPYz_kX7nS73_RIU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
