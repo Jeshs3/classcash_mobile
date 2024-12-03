@@ -1,13 +1,14 @@
 package com.example.classcash.bottombars
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -177,7 +178,7 @@ fun FundSetting(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     label = {
                         Text(
-                            text = "Daily Fund",
+                            text = "Daily Fund per student",
                             color = Color.Gray.copy(alpha = 0.5f),
                             fontSize = 12.sp,
                             fontFamily = FontFamily(Font(R.font.montserrat))
@@ -232,7 +233,6 @@ fun FundSetting(
 
             //Collection Information
             CollectionBox(collectionViewModel, navController)
-
     }
 
     if (errorMessage.isNotEmpty()) {
@@ -268,10 +268,7 @@ fun FundSetting(
             collectionViewModel.clearMessage()
         }
     }
-
 }
-
-
 
 @Composable
 fun MonthSelectionBox(
@@ -348,60 +345,64 @@ fun CollectionBox(
     navController: NavController
 ) {
     // Observe the selected month and month details
-     val monthDetails by collectionViewModel.monthDetailsLiveData.observeAsState(emptyList())
+    val monthDetails by collectionViewModel.monthDetailsLiveData.observeAsState(emptyList())
 
-    Column(
+    Box(
         modifier = Modifier
-            .padding(horizontal = 10.dp, vertical = 10.dp)
+            .fillMaxSize()
             .background(Color(0xFFADEBB3), shape = RoundedCornerShape(16.dp))
     ) {
-        // Use the refactored MonthSelectionBox
-        MonthSelectionBox(collectionViewModel)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 10.dp)
+        ) {
+            // Use the refactored MonthSelectionBox
+            MonthSelectionBox(collectionViewModel)
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        if (monthDetails.isEmpty()) {
-            // Display Empty State
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(10.dp)
-                    .background(Color(0xFFADEBB3)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No details added. Please select a month.",
-                    fontFamily = FontFamily(Font(R.font.montserrat)),
-                    fontSize = 16.sp,
-                    color = Color.Gray
-                )
-            }
-        }else {
-            // Display Month Details in LazyColumn
-
-            LazyColumn(
-                modifier = Modifier
-                    .padding(5.dp)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(monthDetails) { month ->
-                    MonthDetailsRow(
-                        month = month,
-                        onAddActiveDay = { updatedDays ->
-                            collectionViewModel.updateActiveDays(month.monthName, updatedDays)
-                        }
+            if (monthDetails.isEmpty()) {
+                // Display Empty State
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No details added. Please select a month.",
+                        fontFamily = FontFamily(Font(R.font.montserrat)),
+                        fontSize = 16.sp,
+                        color = Color.Gray
                     )
+                }
+            } else {
+                // Display Month Details in LazyColumn
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(monthDetails) { month ->
+                        MonthDetailsRow(
+                            month = month,
+                            onAddActiveDay = { updatedDays ->
+                                collectionViewModel.updateActiveDays(month.monthName, updatedDays)
+                            }
+                        )
+                    }
                 }
             }
         }
-    }
 
-        // Action Buttons
+        // Static Row for buttons at the bottom
         Row(
             modifier = Modifier
-                .padding(8.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter) // Align the buttons at the bottom
+                .padding(8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
@@ -430,6 +431,7 @@ fun CollectionBox(
                     fontFamily = FontFamily(Font(R.font.montserrat))
                 )
             }
+        }
     }
 }
 

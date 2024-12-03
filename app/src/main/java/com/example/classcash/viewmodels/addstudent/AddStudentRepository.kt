@@ -1,7 +1,6 @@
 package com.example.classcash.viewmodels.addstudent
 
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
@@ -11,40 +10,44 @@ import kotlinx.coroutines.withContext
 class StudentRepository(private val db: FirebaseFirestore) {
 
     // Save or update a single student
-    suspend fun saveStudentName(studentId: Int, name: String): Result<Unit> = safeRepositoryCall {
-        val docRef = db.collection("students").document("student_$studentId")
-        docRef.set(mapOf("id" to studentId, "name" to name), SetOptions.merge()).await()
-    }
-
     suspend fun saveStudent(student: Student): Result<Unit> = safeRepositoryCall {
         val docRef = db.collection("students").document("student_${student.studentId}")
         val studentData = mapOf(
-            "id" to student.studentId,
-            "name" to student.name,
-            "balance" to student.balance,
+            "studentId" to student.studentId,
+            "studentName" to student.studentName,
+            "targetAmt" to student.targetAmt,
+            "currentBal" to student.currentBal,
+            "progress" to student.calculateProgress(),
             "transactionLogs" to student.transactionLogs
         )
         docRef.set(studentData).await()
-        //_students.value = _students.value + student
+    }
+
+    // Batch save students
+    suspend fun saveStudentsBatch(students: List<Student>): Result<Unit> = safeRepositoryCall {
+        val batch = db.batch()
+        val collectionRef = db.collection("students")
+
+        students.forEach { student ->
+            val docRef = collectionRef.document("student_${student.studentId}")
+            val studentData = mapOf(
+                "studentId" to student.studentId,
+                "studentName" to student.studentName,
+                "targetAmt" to student.targetAmt,
+                "currentBal" to student.currentBal,
+                "progress" to student.calculateProgress(),
+                "transactionLogs" to student.transactionLogs
+            )
+            batch.set(docRef, studentData)
+        }
+
+        batch.commit().await()
     }
 
     // Remove a student
     suspend fun removeStudent(studentId: Int): Result<Unit> = safeRepositoryCall {
         val docRef = db.collection("students").document("student_$studentId")
         docRef.delete().await()
-    }
-
-    // Batch save students
-    suspend fun saveStudentsBatch(students: List<Pair<Int, String>>): Result<Unit> = safeRepositoryCall {
-        val batch = db.batch()
-        val collectionRef = db.collection("students")
-
-        students.forEach { (id, name) ->
-            val docRef = collectionRef.document("student_$id")
-            batch.set(docRef, mapOf("id" to id, "name" to name))
-        }
-
-        batch.commit().await()
     }
 
     // Fetch student names initially
@@ -57,9 +60,9 @@ class StudentRepository(private val db: FirebaseFirestore) {
 
             if (snapshot != null && !snapshot.isEmpty) {
                 val studentMap = snapshot.documents.associate { doc ->
-                    val id = doc.getLong("id")?.toInt() ?: 0
-                    val name = doc.getString("name") ?: ""
-                    id to name
+                    val studentId = doc.getLong("studentId")?.toInt() ?: 0
+                    val studentName = doc.getString("studentName") ?: ""
+                    studentId to studentName
                 }
                 trySend(studentMap).isSuccess
             }
@@ -84,17 +87,24 @@ class StudentRepository(private val db: FirebaseFirestore) {
         }
     }
 
-    fun getStudentObjectsFlow(): Flow<List<Student>> = flow {
-        // Simulating a database call to fetch all students
-        val studentDocs = db.collection("students").get().await() // Use Firebase's `get()` to fetch all student data
-        val students = studentDocs.documents.mapIndexed { index, doc ->
-            val name = doc.getString("name") ?: "Unknown"
-            val id = doc.getLong("id")?.toInt() ?: (index + 1) // Ensure fallback ID
-            StudentWarehouse.createStudent(studentId = id, name = name)
-        }
-        emit(students)
-    }
+    fun getStudentObjectsFlow(): Flow<List<Student>> = callbackFlow {
+        val listener = db.collection("students").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error) // Propagate the error to the Flow
+                return@addSnapshotListener
+            }
 
+            val students = snapshot?.documents?.mapIndexed { index, doc ->
+                val studentName = doc.getString("studentName") ?: "Unknown"
+                val studentId = doc.getLong("studentId")?.toInt() ?: (index + 1) // Ensure fallback ID
+                StudentWarehouse.createStudent(studentId = studentId, studentName = studentName)
+            } ?: emptyList()
+
+            trySend(students).isSuccess // Emit the updated list
+        }
+
+        awaitClose { listener.remove() } // Clean up the listener when Flow collection stops
+    }.flowOn(Dispatchers.IO)
 
 
     // Helper function to reduce duplicate try-catch blocks

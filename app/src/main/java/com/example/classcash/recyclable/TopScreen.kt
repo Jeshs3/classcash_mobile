@@ -34,7 +34,7 @@ fun TopScreenB(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFADEBB3)) // Set background for the entire top layer
+            .background(Color(0xFF9CFF88))
     ) {
         Row(
             modifier = Modifier
@@ -50,8 +50,7 @@ fun TopScreenB(
                     text = "≡",
                     style = TextStyle(
                         fontSize = 40.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFF50404D)
+                        fontWeight = FontWeight.Normal
                     )
                 )
             }
@@ -91,8 +90,9 @@ fun TopScreenB(
                         text = currentClassName.ifEmpty { "Classroom Name" },
                         style = TextStyle(
                             fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.montserrat)),
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF50404D),
+                            color = Color.Blue
                         ),
                         modifier = Modifier.weight(1f)
                     )
@@ -106,8 +106,7 @@ fun TopScreenB(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_notifications),
-                            contentDescription = "Notifications",
-                            tint = Color(0xFF50404D)
+                            contentDescription = "Notifications"
                         )
                     }
 
@@ -118,8 +117,7 @@ fun TopScreenB(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.user),
-                            contentDescription = "Action",
-                            tint = Color(0xFF50404D)
+                            contentDescription = "Action"
                         )
                     }
                 }

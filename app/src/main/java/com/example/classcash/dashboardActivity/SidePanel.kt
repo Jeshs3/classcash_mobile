@@ -34,7 +34,7 @@ fun SidePanel(
         modifier = Modifier
             .fillMaxHeight()
             .width(200.dp)
-            .background(color = Color(0xFFFFD700)), // Light gray background
+            .background(Color(0xFFFFF3E0)),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         // Navigation Items
@@ -55,7 +55,7 @@ fun SidePanel(
                 title = "Student Files",
                 iconPainter = painterResource(id = R.drawable.folder)
             ) {
-                onNavigationClick("StudentFiles")
+                onNavigationClick(Routes.files)
             }
             SidePanelItem(
                 title = "Delete Class",
@@ -67,7 +67,7 @@ fun SidePanel(
                 title = "About",
                 iconPainter = painterResource(id = R.drawable.info)
             ) {
-                onNavigationClick("About")
+                onNavigationClick(Routes.aboutsection)
             }
 
             Spacer(modifier = Modifier.height(80.dp))

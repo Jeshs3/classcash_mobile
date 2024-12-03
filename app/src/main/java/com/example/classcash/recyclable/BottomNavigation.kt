@@ -51,7 +51,7 @@ fun BottomNavigationBar(navController: NavController) {
             .fillMaxWidth() // Fill the width for a horizontal layout
             .clip(RoundedCornerShape(10.dp))
             .border(width = 2.dp, shape = RoundedCornerShape(10.dp), color = Color.Green),
-        containerColor = Color(0xFFADEBB3) // Set the dynamic background color
+        containerColor = Color(0xFF75DB1B)
     ) {
         // Create a NavigationBarItem for each screen
         items.forEach { screen ->
@@ -71,13 +71,14 @@ fun BottomNavigationBar(navController: NavController) {
                         Icon(
                             painterResource(id = screen.icon),
                             contentDescription = screen.label,
-                            tint = if (currentRoute == screen.route) Color(0xFF50404D) else Color.Gray
+                            tint = if (currentRoute == screen.route) Color(0xFF50404D) else Color.Blue
                         )
                 },
                 label = {
                     Text(
                         text = screen.label,
                         fontSize = 8.sp,
+                        color = Color.White,
                         fontFamily = FontFamily(Font(R.font.inter, FontWeight.Normal))
                     )
                 },

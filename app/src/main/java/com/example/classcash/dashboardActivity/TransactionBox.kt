@@ -1,31 +1,61 @@
 package com.example.classcash.dashboardActivity
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.*
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.classcash.R
+import com.example.classcash.viewmodels.addstudent.Student
+import com.example.classcash.viewmodels.dashboard.DashboardViewModel
+import com.example.classcash.viewmodels.payment.PaymentViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun PaymentBox(navController: NavController) {
-
+fun PaymentBox(
+    navController: NavController,
+    paymentViewModel: PaymentViewModel,
+    dashboardViewModel : DashboardViewModel,
+    studentId: Int
+) {
     val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
     var amount by remember { mutableStateOf("") }
-    var showError by remember {mutableStateOf(false)}
-    //var studentName by remember {mutableStateOf("")}
+    var showError by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) } // Track loading state
+    var studentData by remember { mutableStateOf<Student?>(null) }
+
+    // Fetch student data when studentId changes
+    LaunchedEffect(studentId) {
+        Log.d("PaymentBox", "Fetching data for studentId: $studentId")
+        paymentViewModel.fetchStudentData(studentId) { fetchedStudent ->
+            if (fetchedStudent != null) {
+                Log.d("PaymentBox", "Student fetched: ${fetchedStudent.studentName}")
+            } else {
+                Log.e("PaymentBox", "No data found for studentId: $studentId")
+            }
+            studentData = fetchedStudent
+            Log.d("PaymentBox", "Updated studentData: $studentData")
+            isLoading = false
+        }
+    }
+
+
 
     Dialog(onDismissRequest = { navController.popBackStack() }) {
         Box(
@@ -34,99 +64,122 @@ fun PaymentBox(navController: NavController) {
                 .background(Color(0xFFADEBB3), RoundedCornerShape(8.dp))
                 .padding(16.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Header row with title and close icon
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            if (isLoading) {
+                // Display a loading indicator
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.Blue
+                )
+            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Header row with title and close icon
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Log.d("PaymentBox", "Student ID: ${studentData?.studentId}")
+                        Log.d("PaymentBox", "Student Name: ${studentData?.studentName}")
+                        Text(
+                            text = "ID: ${studentData?.studentId ?: "No ID found"}\n" +
+                                    "Name: ${studentData?.studentName.takeIf { !it.isNullOrEmpty() } ?: "No name found"}",
+                            fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
+                            fontSize = 16.sp
+                        )
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_close),
+                                contentDescription = "Close"
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Display date
                     Text(
-                        text = "Grizzly",
-                        fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
-                        fontSize = 16.sp
+                        text = date,
+                        fontFamily = FontFamily(Font(R.font.montserrat)),
+                        fontSize = 12.sp,
+                        color = Color.Gray
                     )
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_close),
-                            contentDescription = "Close"
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Amount input field
+                    Text(
+                        text = "Input Balance:",
+                        fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Medium)),
+                        fontSize = 14.sp
+                    )
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { input ->
+                            // Validate input to allow only numbers
+                            if (input.all { it.isDigit() || it == '.' }) {
+                                amount = input
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        placeholder = {
+                            Text(
+                                text = "Please enter amount",
+                                fontFamily = FontFamily(Font(R.font.inter)),
+                                color = Color.Red.copy(alpha = 0.8f)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Enter button
+                    Button(
+                        onClick = {
+                            if (amount.isNotBlank()) {
+                                paymentViewModel.processPayment(studentId, amount) { success ->
+                                    Log.d("PaymentBox", "Payment success: $success") // Debugging line
+                                    if (success) {
+                                        dashboardViewModel.refreshStudentObjects()
+                                        navController.popBackStack()
+                                    } else {
+                                        showError = true
+                                    }
+                                }
+                            } else {
+                                showError = true
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .clip(RoundedCornerShape(50))
+                    ) {
+                        Text(
+                            text = "Enter",
+                            color = Color.White,
+                            fontFamily = FontFamily(Font(R.font.montserrat))
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Display date
-                Text(
-                    text = date,
-                    fontFamily = FontFamily(Font(R.font.montserrat)),
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Amount input field
-                Text(
-                    text = "Input Balance:",
-                    fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Medium)),
-                    fontSize = 14.sp
-                )
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { input ->
-                        // Validate input to allow only numbers
-                        if (input.all { it.isDigit() || it == '.' }) {
-                            amount = input
-                        }
-                    },
-                    placeholder = {
+                    // Error message display
+                    if (showError) {
                         Text(
-                            text = "Please enter amount",
-                            fontFamily = FontFamily(Font(R.font.inter)),
-                            color = Color.Red.copy(alpha = 0.8f)
+                            text = "Please enter a valid amount",
+                            color = Color.Red,
+                            fontFamily = FontFamily(Font(R.font.montserrat)),
+                            modifier = Modifier.padding(top = 16.dp)
                         )
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Enter button
-                Button(
-                    onClick = {
-                        /*val amountDouble = amount.toDoubleOrNull()
-                        if (amountDouble != null) {
-                            paymentPresenter.onPayButtonClicked(studentName, amountDouble)
-                            navController.popBackStack()
-                        } else {
-                            showError = true
-                        }*/
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .clip(RoundedCornerShape(50))
-                ) {
-                    Text(
-                        text = "Enter",
-                        color = Color.White,
-                        fontFamily = FontFamily(Font(R.font.montserrat))
-                    )
+                    }
                 }
             }
         }
     }
-
-    if(showError){
-        Text(
-            text = "Please enter valid amount",
-            color = Color.Red,
-            fontFamily = FontFamily(Font(R.font.inter))
-        )
-    }
 }
+
+
+
 
 
 @Composable

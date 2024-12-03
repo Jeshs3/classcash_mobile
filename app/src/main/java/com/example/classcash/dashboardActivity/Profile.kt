@@ -31,7 +31,7 @@ fun ProfileScreen(
     val treasurerName = profileViewModel.treasurerName.observeAsState(initial = "Loading...")
     //val treasurerName = authViewModel.name.value.observeAsState("")
     val classroomName = profileViewModel.classroomName.observeAsState(initial = "Loading...")
-    val profileImage = profileViewModel.profileImage.observeAsState(initial = null)
+    profileViewModel.profileImage.observeAsState(initial = null)
 
     Dialog(onDismissRequest = { navController.popBackStack() }) {
         Column(

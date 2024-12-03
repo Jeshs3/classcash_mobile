@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -32,6 +33,8 @@ import com.example.classcash.dashboardActivity.ExternalFundBox
 import com.example.classcash.dashboardActivity.LoginScreen
 import com.example.classcash.dashboardActivity.ProfileScreen
 import com.example.classcash.dashboardActivity.SidePanel
+import com.example.classcash.dashboardActivity.sidepanel.About
+import com.example.classcash.dashboardActivity.sidepanel.StudentFiles
 import com.example.classcash.recyclable.BottomNavigationBar
 import com.example.classcash.recyclable.TopScreenB
 import com.example.classcash.viewmodels.addstudent.AddStudentViewModel
@@ -46,6 +49,9 @@ import com.example.classcash.viewmodels.dashboard.DashboardViewModelFactory
 import com.example.classcash.viewmodels.event.AddEventViewModel
 import com.example.classcash.viewmodels.event.AddEventViewModelFactory
 import com.example.classcash.viewmodels.event.EventRepository
+import com.example.classcash.viewmodels.payment.PaymentRepository
+import com.example.classcash.viewmodels.payment.PaymentViewModel
+import com.example.classcash.viewmodels.payment.PaymentViewModelFactory
 import com.example.classcash.viewmodels.treasurer.AuthViewModel
 import com.example.classcash.viewmodels.treasurer.ProfileRepository
 import com.example.classcash.viewmodels.treasurer.ProfileViewModel
@@ -88,10 +94,6 @@ fun ClassCash() {
         factory = AddStudentViewModelFactory(studentRepository)
     )
 
-    val dashboardViewModel: DashboardViewModel = viewModel(
-        factory = DashboardViewModelFactory(studentRepository)
-    )
-
     // Profile
     val profileRepository = ProfileRepository(authViewModel, topScreenViewModel)
     val profileViewModelFactory = ProfileViewModelFactory(profileRepository)
@@ -107,6 +109,15 @@ fun ClassCash() {
     val collectionViewModelFactory = CollectionViewModelFactory(collectionRepository)
     val collectionViewModel: CollectionViewModel = viewModel(factory = collectionViewModelFactory)
 
+    //Payment
+    val paymentRepository = PaymentRepository()
+    val paymentViewModelFactory = PaymentViewModelFactory(paymentRepository)
+    val paymentViewModel : PaymentViewModel = viewModel(factory = paymentViewModelFactory)
+
+
+    val dashboardViewModel: DashboardViewModel = viewModel(
+        factory = DashboardViewModelFactory(studentRepository, paymentRepository)
+    )
     // Routes where TopBar and SidePanel are visible
     val topBarRoutes = listOf(
         Routes.dashboard,
@@ -167,7 +178,7 @@ fun ClassCash() {
                     navController = navController,
                     startDestination = Routes.splashscreen,
                     Modifier.padding(innerPadding)
-                ) {
+                )  {
                     composable(Routes.splashscreen) {
                         SplashScreen(navController)
                     }
@@ -229,8 +240,19 @@ fun ClassCash() {
                     composable(Routes.notification) {
                         Notifications(navController)
                     }
-                    composable(Routes.pbox) {
-                        PaymentBox(navController)
+                    composable(Routes.pbox) { backStackEntry ->
+                        // Extract `studentId` from the navigation arguments or pass it directly
+                        val studentId = backStackEntry.arguments?.getString("studentId")?.toIntOrNull() ?: 0
+
+                        Log.d("Navigation", "Student ID received: $studentId")
+
+                        PaymentBox(
+                            navController,
+                            paymentViewModel,// Make sure this is initialized in your Activity or ViewModel scope
+                            dashboardViewModel,
+                            studentId
+                        )
+
                     }
                     composable(Routes.withdrawbox) {
                         WithdrawBox(navController)
@@ -243,6 +265,12 @@ fun ClassCash() {
                             navController,
                             profileViewModel
                         )
+                    }
+                    composable(Routes.files) {
+                        StudentFiles()
+                    }
+                    composable(Routes.aboutsection) {
+                        About(navController)
                     }
                 }
             }

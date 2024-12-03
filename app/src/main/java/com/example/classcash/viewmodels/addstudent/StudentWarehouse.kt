@@ -1,12 +1,12 @@
 package com.example.classcash.viewmodels.addstudent
 
 object StudentWarehouse {
-    fun createStudent(studentId: Int, name: String): Student {
+    fun createStudent(studentId: Int, studentName: String, targetAmt: Double = 0.0): Student {
         return Student(
             studentId = studentId,
-            name = name,
-            balance = 0.0,              // Default balance
-            progress = 0.0,             // Default progress
+            studentName = studentName,
+            targetAmt = targetAmt,          // Default target amount
+            currentBal = 0.0,               // Default balance
             transactionLogs = mutableListOf() // Empty logs
         )
     }

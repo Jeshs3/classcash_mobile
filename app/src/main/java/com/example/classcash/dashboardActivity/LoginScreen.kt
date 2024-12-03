@@ -146,7 +146,12 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                     OutlinedTextField(
                         value = email,
                         onValueChange = { authViewModel.onEmailChange(it) },
-                        label = { Text(text = "Email", fontSize = 12.sp) },
+                        label = {
+                            Text(
+                                text = "Email",
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace
+                                ) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
@@ -164,7 +169,12 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                         value = password,
                         visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         onValueChange = { authViewModel.onPasswordChange(it) },
-                        label = { Text(text = "Password", fontSize = 12.sp) },
+                        label = {
+                            Text(
+                                text = "Password",
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace
+                            ) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
@@ -186,8 +196,6 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                         }
                     )
 
-                    Spacer(modifier = Modifier.height(60.dp))
-
                     //If REGISTRATION IS SUCCESSFUL
                     // Handle both success and error messages
                     if (!successMessage.isNullOrEmpty()) {
@@ -200,7 +208,7 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Button(
                         onClick = {
@@ -234,7 +242,7 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                         modifier = Modifier
-                            .width(200.dp)
+                            .fillMaxWidth()
                             .height(40.dp)
                             .align(CenterHorizontally)
                     ) {
@@ -252,7 +260,6 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                         fontFamily = FontFamily(Font(R.font.inter))
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
 
                     TextButton(
                         onClick = {loginMode = !loginMode}
@@ -327,7 +334,6 @@ fun SuccessDialog(message: String, onDismiss: () -> Unit) {
         ) {
             Text(
                 text = message,
-                color = Color.Green,
                 textAlign = TextAlign.Center)
         }
 

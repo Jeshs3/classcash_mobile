@@ -5,9 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,11 +52,7 @@ fun AddStudentScreen(
                 .fillMaxWidth()
                 .padding(10.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFFADEBB3), Color(0xFFFBFCFE))
-                    )
-                )
+                .background(Color(0xFFADEBB3))
         ) {
             Row(
                 modifier = Modifier
@@ -93,11 +87,7 @@ fun AddStudentScreen(
                 .weight(1f)
                 .padding(15.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFFADEBB3), Color(0xFFFBFCFE))
-                    )
-                )
+                .background(Color(0xFFADEBB3))
         ) {
             // Input Field
             OutlinedTextField(
@@ -177,7 +167,7 @@ fun AddStudentScreen(
                 navController.popBackStack()
                 addStudentViewModel.clearInputFields()
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Blue),
             modifier = Modifier
                 .padding(16.dp)
                 .clip(RoundedCornerShape(50))

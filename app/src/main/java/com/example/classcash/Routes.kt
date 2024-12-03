@@ -11,9 +11,12 @@ object Routes {
     var recommend = "recommend"
     var trview = "trview"
     var notification = "notification"
-    var pbox = "pbox"
+    var pbox = "pbox/{studentId}"
     var withdrawbox = "withdrawbox"
     var extfund = "extfund"
     var profile = "profile"
+    var files = "files"
+    var aboutsection = "aboutsection"
 
+    fun pbox(studentId: Int) = "pbox/$studentId"
 }

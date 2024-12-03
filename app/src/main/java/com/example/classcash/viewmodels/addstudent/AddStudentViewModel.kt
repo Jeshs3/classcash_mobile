@@ -1,5 +1,6 @@
 package com.example.classcash.viewmodels.addstudent
 
+import android.util.Log
 import androidx.lifecycle.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -34,20 +35,24 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
         }
     }
 
-    fun addStudent(name: String) {
-        if (name.isBlank()) return
-        if (_studentNames.value.contains(name)) {
+    fun addStudent(studentName: String) {
+        if (studentName.isBlank()) return
+        if (_studentNames.value.contains(studentName)) {
             _uiState.value = UiState.Error("Duplicate student name")
             return
         }
 
         performActionWithUiState {
-            val newStudentId = generateNewStudentId() // Example function to generate IDs
-            val result = repository.saveStudentName(newStudentId, name)
+            val newStudentId = generateNewStudentId()
+            val newStudent = StudentWarehouse.createStudent(
+                studentId = newStudentId,
+                studentName = studentName
+            )
+            val result = repository.saveStudent(newStudent)
             if (result.isSuccess) {
-                _studentNames.value = _studentNames.value + name
+                _studentNames.value = (_studentNames.value + studentName).distinct()
                 updateClassSize()
-                UiState.Success("$name added successfully")
+                UiState.Success("$studentName added successfully")
             } else {
                 UiState.Error("Failed to add student: ${result.exceptionOrNull()?.message}")
             }
@@ -56,6 +61,7 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
 
     fun updateClassSize() {
         _classSize.value = _studentNames.value.distinct().count { it.isNotBlank() }
+        Log.d("AddStudentViewModel", "Class size updated: ${_classSize.value}")
     }
 
     fun clearStudentName() {
@@ -83,10 +89,15 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
                 .filter { it.isNotBlank() }
                 .distinct()
                 .mapIndexed { index, name ->
-                    index + 1 to name // Generate student ID
+                    Student(
+                        studentId = index + 1,// Generate student ID as a string
+                        studentName = name
+                    )
                 }
+            Log.d("AddStudentViewModel", "Saving all students: $students")
 
             val result = repository.saveStudentsBatch(students)
+
             if (result.isSuccess) {
                 UiState.Success("All students added successfully")
             } else {
@@ -94,6 +105,7 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
             }
         }
     }
+
 
     fun removeStudent(index: Int) {
         _studentNames.value = _studentNames.value.filterIndexed { i, _ -> i != index }

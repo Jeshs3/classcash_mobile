@@ -1,5 +1,6 @@
 package com.example.classcash.dashboardActivity
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +23,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavController
 import com.example.classcash.R
@@ -70,6 +73,16 @@ fun DashboardScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ){
+            IconButton(onClick = { navController.navigate(Routes.studentadd) }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_search),
+                    contentDescription = "Search Student",
+                    tint = Color.Blue,
+                    modifier = Modifier
+                        .size(30.dp)
+                )
+            }
+
             Text(
                 text = "Class Size: $classSize students",
                 fontFamily = FontFamily(Font(R.font.montserrat)),
@@ -87,7 +100,7 @@ fun DashboardScreen(
             }
 
         }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             StudentsList(
                 navController,
@@ -123,10 +136,9 @@ fun BalanceBox(
     var showDialog by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
-            .padding(horizontal = 15.dp)
+            .padding(horizontal = 40.dp)
             .fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
@@ -134,7 +146,7 @@ fun BalanceBox(
                 .shadow(8.dp, RoundedCornerShape(10.dp))
                 .background(Color.White)
                 .width(200.dp)
-                .padding(vertical = 16.dp, horizontal = 16.dp)
+                .padding(vertical = 16.dp, horizontal = 10.dp)
                 .wrapContentSize(Alignment.Center),
             contentAlignment = Alignment.Center,
         ) {
@@ -154,15 +166,15 @@ fun BalanceBox(
             }
         }
 
+        Spacer(modifier = Modifier.width(20.dp))
 
         //Display the snippet for the fund
         IconButton(onClick = { showDialog = true }) {
             Icon(
                 painter = painterResource(id = R.drawable.piggy_bank),
                 contentDescription = "Show Fund Details",
-                tint = Color.Blue,
                 modifier = Modifier
-                    .size(50.dp)
+                    .size(80.dp)
 
             )
         }
@@ -257,7 +269,7 @@ fun StudentsList(
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (students.isEmpty()) {
@@ -273,10 +285,13 @@ fun StudentsList(
             }
         } else {
             items(students) { student ->
-                // Integrating StudentItem into the StudentsList composable
-                val progress = student.progress // Fetch progress dynamically from the student object
-                val amount = student.balance // Fetch balance dynamically from the student object
-                val formatter = DecimalFormat("₱#.00")
+                // Calculating progress and current balance for each student
+                val progress = student.calculateProgress()
+                val amount = student.currentBal
+
+                // Format the balance for display
+                val formatter = DecimalFormat("₱0.00")
+                formatter.format(amount)
 
                 Row(
                     modifier = Modifier
@@ -284,8 +299,10 @@ fun StudentsList(
                         .clip(RoundedCornerShape(10.dp))
                         .padding(9.dp)
                         .background(Color(0xFFADEBB3), shape = RoundedCornerShape(16.dp)),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // Circular Progress Indicator for displaying progress as a circle
                     Box(
                         modifier = Modifier
                             .clickable {
@@ -297,42 +314,81 @@ fun StudentsList(
                             .background(Color(0xFFADEBB3), shape = CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Custom Circular Progress using Canvas
+                        Canvas(modifier = Modifier.size(50.dp)) {
+                            val progressValue = progress / 100f
+                            val strokeWidth = 6f
+                            val radius = size.minDimension / 2
+                            val angle = 360f * progressValue
+
+                            // Draw background circle
+                            drawArc(
+                                color = Color.Gray,
+                                startAngle = 0f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                size = Size(radius * 2, radius * 2),
+                                style = Stroke(width = strokeWidth)
+                            )
+
+                            // Draw progress circle
+                            drawArc(
+                                color = Color.Blue,
+                                startAngle = -90f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                size = Size(radius * 2, radius * 2),
+                                style = Stroke(width = strokeWidth)
+                            )
+                        }
+
+                        // Display progress percentage inside the circle
                         Text(
-                            "$progress%", // Display progress as a percentage
+                            "$progress%",
                             color = Color.Blue,
-                            fontFamily = FontFamily(Font(R.font.inter, FontWeight.ExtraBold))
+                            fontFamily = FontFamily(Font(R.font.inter, FontWeight.ExtraBold)),
+                            fontSize = 12.sp
                         )
                     }
 
-                    Spacer(modifier = Modifier.fillMaxWidth(0.2f))
 
-                    Text(
+
+                    // Spacer for adjusting the layout
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Student Name centered in the row
+                    Box(
                         modifier = Modifier
+                            .weight(1f)
                             .clickable {
                                 navController.navigate(Routes.trview)
                             },
-                        text = if (student.name.isBlank()) "No data added" else student.name, // Use student object here
-                        fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
-                        fontSize = 12.sp
-                    )
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (student.studentName.isBlank()) "No data added" else student.studentName, // Display student name
+                            fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.fillMaxWidth(0.2f))
-
+                    // Amount Box aligned to the right
                     Box(
                         modifier = Modifier
                             .clickable {
-                                navController.navigate("pbox/${student.name}") // Pass the student's name or ID to the next screen
+                                navController.navigate(Routes.pbox(student.studentId))
                             }
                             .padding(7.dp)
-                            .fillMaxWidth()
+                            .width(80.dp)
                             .height(50.dp)
                             .clip(RoundedCornerShape(80.dp))
-                            .background(Color(0xFFFFD700)),
+                            .background(Color(0xFFFFF3E0)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = formatter.format(amount), // Display formatted balance
-                            fontSize = 15.sp,
+                            fontSize = 12.sp,
                             fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold))
                         )
                     }

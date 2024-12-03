@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import android.app.DatePickerDialog
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
@@ -55,25 +56,25 @@ fun EventScreen(
         item {
             AddEventSection(eventId = null, addEventViewModel)
         }
-
-        // Event List section
-        //item {
-         //   EventList(addEventViewModel)
-        //}
     }
 }
+
+
 @Composable
 fun CalendarScreen(calendarViewModel: CalendarViewModel = CalendarViewModel()) {
-
     val (currentYear, currentMonth) = remember { calendarViewModel.getCurrentMonth() }
     val daysForMonth = remember { calendarViewModel.getDaysForMonth(currentYear, currentMonth) }
     val monthEnum = Month.values().firstOrNull { it.ordinal == currentMonth - 1 }
+
+    // State to track start and end dates
+    var startDate by remember { mutableStateOf<LocalDate?>(null) }
+    var endDate by remember { mutableStateOf<LocalDate?>(null) }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .padding(10.dp)
     ) {
         // Month and Year Header
         Text(
@@ -102,7 +103,6 @@ fun CalendarScreen(calendarViewModel: CalendarViewModel = CalendarViewModel()) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Calendar Grid
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
             contentPadding = PaddingValues(4.dp),
@@ -112,11 +112,19 @@ fun CalendarScreen(calendarViewModel: CalendarViewModel = CalendarViewModel()) {
         ) {
             items(daysForMonth.size) { index ->
                 val date = daysForMonth[index]
+
+                // Use local variables to avoid smart cast issues
+                val start = startDate
+                val end = endDate
+
+                val isInRange = date != null && start != null && end != null &&
+                        (date == start || date == end || (date > start && date < end))
+
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            if (date != null) Color(0xFFE8F5E9) else Color.Transparent
+                            if (isInRange) Color(0xFFE8F5E9) else Color.Transparent
                         )
                         .border(1.dp, Color.LightGray),
                     contentAlignment = Alignment.Center
@@ -131,86 +139,8 @@ fun CalendarScreen(calendarViewModel: CalendarViewModel = CalendarViewModel()) {
     }
 }
 
-/*@Composable
-fun EventList(addEventViewModel: AddEventViewModel) {
-    // Collect the events list as state to ensure recomposition
-    val events by addEventViewModel.events.collectAsState(emptyList())
-    val isLoading = events.isEmpty() // Assuming isEmpty indicates no events loaded
 
-    // Display a loading state or empty state if needed
-    when {
-        isLoading -> {
-            // Show a loading spinner or some indication that the data is being fetched/loaded
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .wrapContentSize(Alignment.Center)
-            )
-        }
-        events.isEmpty() -> {
-            // Display a placeholder when no events are available
-            Text(
-                text = "No events added yet.",
-                fontFamily = FontFamily(Font(R.font.inter)),
-                color = Color.Gray,
-                modifier = Modifier.padding(16.dp)
-            )
-        }
-        else -> {
-            // Display the list of events using LazyColumn
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(events) { event ->
-                    // Use the EventBox inline for each event in the list
-                    Box(
-                        modifier = Modifier
-                            .height(90.dp)
-                            .padding(8.dp)
-                            .border(BorderStroke(2.dp, Color.Blue), RoundedCornerShape(12.dp))
-                            .background(Color(0xFFFBFCFE), RoundedCornerShape(10.dp))
-                            .padding(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = event.eventName,
-                                    fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold))
-                                )
-                                Text(
-                                    text = "From ${event.startDate} to ${event.endDate}",
-                                    fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
-                                    color = Color.Gray
-                                )
-                            }
-                            IconButton(
-                                onClick = { addEventViewModel.removeEvent(event.eventId) },
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.delete_btn),
-                                    contentDescription = "Delete Event",
-                                    tint = Color(0xFFE9967A)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-*/
+
 
 @Composable
 fun AddEventSection(
@@ -222,6 +152,18 @@ fun AddEventSection(
     var endDate by remember { mutableStateOf<LocalDate?>(null) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var isEditable by remember { mutableStateOf(true) } // Toggle between editable and display modes
+    var showAddEventIcon by remember { mutableStateOf(false) } // To toggle the visibility of Add Event section
+
+    val inactivityTimeout = 3000L
+    var lastInputTimestamp by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(eventName, startDate, endDate) {
+        if (!isEditable) return@LaunchedEffect
+        val now = System.currentTimeMillis()
+        if (now - lastInputTimestamp >= inactivityTimeout) {
+            isEditable = false
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -229,103 +171,137 @@ fun AddEventSection(
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Add Event",
-            fontFamily = FontFamily(Font(R.font.montserrat)),
-            modifier = Modifier.padding(10.dp)
-        )
-
-        if (isEditable) {
-            // Editable mode: Allow user input
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(width = 1.dp, shape = RoundedCornerShape(16.dp), color = Color.Blue)
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+        if (showAddEventIcon) {
+            IconButton(
+                onClick = { showAddEventIcon = false }
             ) {
-                TextField(
-                    value = eventName,
-                    onValueChange = { eventName = it },
-                    label = { Text("Event Name", fontFamily = FontFamily(Font(R.font.inter))) },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                    ),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .weight(1f)
-                        .padding(end = 8.dp),
-                    singleLine = true
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_event),
+                    contentDescription = "Add Event",
+                    tint = Color.Blue
                 )
-
-                IconButton(onClick = { showDatePickerDialog = true }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.date_range),
-                        contentDescription = "Calendar Icon",
-                        tint = Color.Blue
-                    )
-                }
-
-                IconButton(
-                    onClick = {
-                        if (eventName.isNotBlank() && startDate != null && endDate != null) {
-                            isEditable = false // Switch to display mode
-                            addEventViewModel.addEvent(eventName, startDate!!, endDate!!)
-                        }
-                    }
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.generate_budget),
-                        contentDescription = "Generate Budget",
-                        tint = Color.Blue
-                    )
-                }
             }
         } else {
-            // Display mode: Show event details with swipe-to-delete functionality
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-                    .border(BorderStroke(2.dp, Color.Blue), RoundedCornerShape(12.dp))
-                    .background(Color(0xFFFBFCFE), RoundedCornerShape(10.dp))
-                    .padding(8.dp)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures { change, dragAmount ->
-                            if (dragAmount > 100) { // Swipe right threshold
-                                isEditable = true // Switch back to editable mode
-                                eventName = ""
-                                startDate = null
-                                endDate = null
-                                eventId?.let { id ->
-                                    addEventViewModel.removeEvent(id) // Pass event ID to removeEvent
+            Text(
+                text = "Add Event",
+                fontFamily = FontFamily(Font(R.font.montserrat)),
+                modifier = Modifier.padding(10.dp)
+            )
+
+            if (isEditable) {
+                // Editable mode: Allow user input
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(width = 1.dp, shape = RoundedCornerShape(16.dp), color = Color.Blue)
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextField(
+                        value = eventName,
+                        onValueChange = {
+                            eventName = it
+                            lastInputTimestamp = System.currentTimeMillis()
+                        },
+                        label = { Text("Event Name", fontFamily = FontFamily(Font(R.font.inter))) },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        singleLine = true
+                    )
+
+                    IconButton(onClick = { showDatePickerDialog = true }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.date_range),
+                            contentDescription = "Calendar Icon",
+                            tint = Color.Blue
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            if (eventName.isNotBlank() && startDate != null && endDate != null) {
+                                isEditable = false
+                                showAddEventIcon = true
+                                addEventViewModel.addEvent(eventName, startDate!!, endDate!!)
+                            }
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.generate_budget),
+                            contentDescription = "Generate Budget",
+                            tint = Color.Blue
+                        )
+                    }
+                }
+            } else {
+                // Display mode: Show event details and allow swipe-to-delete
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                        .padding(8.dp)
+                        .border(BorderStroke(2.dp, Color.Blue), RoundedCornerShape(12.dp))
+                        .background(Color(0xFFFBFCFE), RoundedCornerShape(10.dp))
+                        .padding(8.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures { _, dragAmount ->
+                                if (dragAmount > 100) { // Swipe right threshold
+                                    eventName = ""
+                                    startDate = null
+                                    endDate = null
+                                    eventId?.let { addEventViewModel.removeEvent(it) }
                                 }
                             }
                         }
-                    }
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = eventName,
-                            fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold))
-                        )
-                        Text(
-                            text = "From ${startDate.toString()} to ${endDate.toString()}",
-                            fontFamily = FontFamily(Font(R.font.montserrat)),
-                            color = Color.Gray
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column (
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = eventName,
+                                fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold))
+                            )
+                            Text(
+                                text = "From ${startDate.toString()} to ${endDate.toString()}",
+                                fontFamily = FontFamily(Font(R.font.montserrat)),
+                                color = Color.Gray
+                            )
+                            IconButton(
+                                onClick = {
+                                    if (eventName.isNotBlank() && startDate != null && endDate != null) {
+                                        isEditable = false
+                                        showAddEventIcon = true
+                                        addEventViewModel.addEvent(eventName, startDate!!, endDate!!)
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.generate_budget),
+                                    contentDescription = "Generate Budget",
+                                    tint = Color.Blue
+                                )
+                            }
+
+                            Text(
+                                text = "Swipe → to delete",
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily(Font(R.font.inter)),
+                                color = Color.Red
+                            )
+                        }
                     }
-                    Text(
-                        text = "Swipe → to delete",
-                        fontFamily = FontFamily(Font(R.font.inter)),
-                        color = Color.Gray
-                    )
                 }
             }
         }
@@ -336,7 +312,9 @@ fun AddEventSection(
                 onDismissRequest = { showDatePickerDialog = false },
                 title = { Text("Select Date Range", textAlign = TextAlign.Center) },
                 text = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally) {
                         DatePickerButton(
                             label = "Start Date",
                             selectedDate = startDate,
@@ -374,8 +352,6 @@ fun AddEventSection(
         }
     }
 }
-
-
 
 
 @Composable
