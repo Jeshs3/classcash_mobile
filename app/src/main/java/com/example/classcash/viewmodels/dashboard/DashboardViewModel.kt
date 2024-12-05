@@ -39,21 +39,27 @@ class DashboardViewModel(
         }
     }
 
-    // Function to manually trigger a refresh of the student list
-    fun refreshStudentObjects() {
-        fetchStudentObjects()  // Re-fetching the student data
+    private suspend fun fetchStudentData() {
+        studentRepository.getStudentObjectsFlow()
+            .collect { students ->
+                _studentObjects.emit(students) // Emit the collected data into the StateFlow
+            }
     }
 
-    fun refreshStudentPayment(studentId: Int, amount: Double) {
+
+    fun refreshStudentObjects() {
         viewModelScope.launch {
+            _uiState.value = UiState.Loading
             try {
-                paymentRepository.recordPayment(studentId, amount)
-                refreshStudentObjects() // Refresh after recording payment
+                fetchStudentData() // Collect and emit data from the flow
+                _uiState.value = UiState.Success("Students refreshed successfully")
             } catch (e: Exception) {
-                _uiState.value = UiState.Error("Error recording payment: ${e.message}")
+                _uiState.value = UiState.Error("Error refreshing students: ${e.message}")
             }
         }
     }
+
+
     // Helper functions to manage UI state
     sealed class UiState {
         object Idle : UiState()

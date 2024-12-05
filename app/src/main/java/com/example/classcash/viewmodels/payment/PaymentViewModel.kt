@@ -169,6 +169,7 @@ class PaymentViewModel(private val paymentRepository: PaymentRepository) : ViewM
         return amount > 0
     }
 
+
     // Utility function to get the current date
     private fun getCurrentDate(): String {
         val dateFormat = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())

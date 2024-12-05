@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,7 +16,6 @@ import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.classcash.R
 import com.example.classcash.viewmodels.addstudent.Student
@@ -37,8 +35,10 @@ fun PaymentBox(
     val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
     var amount by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) } // Track loading state
+    var isLoading by remember { mutableStateOf(true) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
     var studentData by remember { mutableStateOf<Student?>(null) }
+
 
     // Fetch student data when studentId changes
     LaunchedEffect(studentId) {
@@ -137,11 +137,14 @@ fun PaymentBox(
                     Button(
                         onClick = {
                             if (amount.isNotBlank()) {
+                                isLoading = true
                                 paymentViewModel.processPayment(studentId, amount) { success ->
                                     Log.d("PaymentBox", "Payment success: $success") // Debugging line
                                     if (success) {
+                                        isLoading = false
                                         dashboardViewModel.refreshStudentObjects()
-                                        navController.popBackStack()
+                                        //paymentViewModel.fetchClassBalance()
+                                        showSuccessDialog = true
                                     } else {
                                         showError = true
                                     }
@@ -175,6 +178,34 @@ fun PaymentBox(
                 }
             }
         }
+    }
+
+    // Success dialog
+    if (showSuccessDialog) {
+
+        AlertDialog(
+            onDismissRequest = {showSuccessDialog = false},
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSuccessDialog = false
+                        navController.popBackStack()
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            text = {
+                Text(
+                    text = "ID: ${studentData?.studentId}\n" +
+                            "Student Name: ${studentData?.studentName}\n" +
+                            "Payment Added: ₱$amount on $date",
+                    fontFamily = FontFamily(Font(R.font.montserrat)),
+                    fontSize = 14.sp
+                )
+            },
+            title = { Text("Payment Confirmation") }
+        )
     }
 }
 

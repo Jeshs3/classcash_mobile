@@ -1,280 +1,322 @@
 package com.example.classcash.bottombars
 
-import androidx.compose.animation.AnimatedVisibility
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.example.classcash.R
 import com.example.classcash.Routes
 import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.collection.CollectionViewModel
-import com.example.classcash.viewmodels.collection.Month
 import java.util.Calendar
-
 
 
 @Composable
 fun FundSetting(
-    navController:NavController,
-    topScreenViewModel : TopScreenViewModel,
+    navController: NavController,
+    topScreenViewModel: TopScreenViewModel,
     collectionViewModel: CollectionViewModel
 ) {
+    var showResetDialog by remember { mutableStateOf(false) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var isResetting by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     var isEditingDuration by remember { mutableStateOf(true) }
     var isEditingDailyFund by remember { mutableStateOf(true) }
     var duration by remember { mutableStateOf("") }
     var dailyFund by remember { mutableStateOf("") }
-    val errorMessage by collectionViewModel.errorMessage.observeAsState("")
+    val errorMessage = (collectionViewModel.message.observeAsState(null).value as? CollectionViewModel.MessageType.Error)?.message
 
-
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 8.dp)
-            .background(Color(0xFFFBFCFE)),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color(0xFFFBFCFE))
     ) {
-
-        //Screen label
-        Text(
-            text = "Set Collection",
-            fontSize = 15.sp,
-            fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-
-        //Duration Field (editable or label based on state)
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(10.dp),
-                    clip = false
-                )
-                .background(Color(0xFFADEBB3))
-                .height(60.dp),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .padding(horizontal = 8.dp)
+                .background(Color(0xFFFBFCFE)),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (isEditingDuration) {
-                TextField(
-                    value = duration,
-                    onValueChange = { newValue ->
-                        val filteredInput = newValue.filter { it.isDigit() }
+            Text(
+                text = "Set Collection",
+                fontSize = 15.sp,
+                fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
 
-                        // If the filtered input is valid (not empty), update the ViewModel
-                        if (filteredInput.isNotEmpty()) {
-                            collectionViewModel.updateDuration(filteredInput)
-                            duration = filteredInput // Update duration with the valid numeric input
-                        } else {
-                            // If input is empty or invalid, you can show error message or handle it accordingly
-                            collectionViewModel.updateDuration("") // Or handle error message in VM
-                            duration = "" // Clear the input to prevent invalid display
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = {
-                        Text(
-                            text = "Duration: e.g. 6 months",
-                            color = Color.Gray.copy(alpha = 0.5f),
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily(Font(R.font.montserrat)),
-                        )
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            isEditingDuration = false
-                            collectionViewModel.updateDuration(duration)
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_check),
-                                contentDescription = "Save",
-                                tint = Color.Red.copy(alpha = 0.7f),
-                                modifier = Modifier.size(30.dp)
-                            )
-                        }
-                    }
-                )
-            } else {
-                // Display formatted label text after check is clicked
-                Row(
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = if (duration.isNotEmpty()) "Duration: $duration MONTHS" else "Duration: Not Set",
-                        fontSize = 14.sp,
-                        fontFamily = FontFamily(Font(R.font.montserrat)),
-                        color = Color.Black
-                    )
+            // Editable fields with proper visibility
+            EditableField(
+                isEditing = isEditingDuration,
+                value = duration,
+                label = "Duration: e.g. 6 months",
+                onValueChange = {
+                    duration = it.filter { char -> char.isDigit() }
+                    collectionViewModel.updateDuration(duration)
+                    collectionViewModel.saveCollection()
+                },
+                onEditToggle = { isEditingDuration = it },
+                displayValue = if (duration.isNotEmpty()) "Duration: $duration MONTHS" else "Duration: Not Set"
+            )
 
-                    IconButton(onClick = {isEditingDuration = true}) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.edit_text),
-                            contentDescription = "Edit Data",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-        }
-        // Daily Fund Field (editable or label based on state)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(10.dp),
-                    clip = false
-                )
-                .background(Color(0xFFADEBB3))
-                .height(60.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isEditingDailyFund) {
-                TextField(
-                    value = dailyFund,
-                    onValueChange = { newValue ->
-                        // Filter out non-numeric characters
-                        val filteredInput = newValue.filter { it.isDigit() }
+            EditableField(
+                isEditing = isEditingDailyFund,
+                value = dailyFund,
+                label = "Daily Fund per student",
+                onValueChange = {
+                    dailyFund = it.filter { char -> char.isDigit() }
+                    collectionViewModel.updateDailyFund(dailyFund)
+                    collectionViewModel.saveCollection()
+                },
+                onEditToggle = { isEditingDailyFund = it },
+                displayValue = if (dailyFund.isNotEmpty()) "Daily Fund: ₱$dailyFund.00 per student" else "Daily Fund: Not Set"
+            )
 
-                        // If the filtered input is valid (not empty), update the ViewModel
-                        if (filteredInput.isNotEmpty()) {
-                            collectionViewModel.updateDailyFund(filteredInput)
-                            dailyFund = filteredInput // Update dailyFund with the valid numeric input
-                        } else {
-                            // If input is empty or invalid, handle error or reset value
-                            collectionViewModel.updateDailyFund("") // Optionally handle error message in ViewModel
-                            dailyFund = "" // Clear the input to prevent invalid display
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = {
-                        Text(
-                            text = "Daily Fund per student",
-                            color = Color.Gray.copy(alpha = 0.5f),
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily(Font(R.font.montserrat))
-                        )
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            isEditingDailyFund = false
-                            collectionViewModel.updateDailyFund(dailyFund)
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_check),
-                                contentDescription = "Save",
-                                tint = Color.Red.copy(alpha = 0.7f),
-                                modifier = Modifier.size(30.dp)
-                            )
-                        }
-                    }
-
-                )
-            } else {
-                // Display formatted label text after check is clicked
-                Row(
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text =  if (duration.isNotEmpty()) "Daily Fund: ₱$dailyFund.00 per student" else "Daily Fund: Not Set",
-                        fontSize = 14.sp,
-                        fontFamily = FontFamily(Font(R.font.montserrat)),
-                        color = Color.Black
-                    )
-
-                    IconButton(onClick = { isEditingDailyFund = true }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.edit_text),
-                            contentDescription = "Edit Data",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-        }
             Spacer(modifier = Modifier.height(30.dp))
 
-            //Collection Information
-            CollectionBox(collectionViewModel, navController)
-    }
+            // Collection Information
+            CollectionBox(collectionViewModel)
 
-    if (errorMessage.isNotEmpty()) {
-        Box(
-            modifier = Modifier
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-                .fillMaxWidth()
-                .background(Color(0xFFFFE5E5), shape = RoundedCornerShape(8.dp)) // Light red background
-                .padding(8.dp)
-        ) {
+            Spacer(modifier = Modifier.weight(1f)) // Pushes buttons to the bottom
+
+            // Buttons Row
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_error),
-                    contentDescription = "Error Icon",
-                    tint = Color.Red,
-                    modifier = Modifier.size(16.dp).padding(end = 8.dp)
-                )
-                Text(
-                    text = errorMessage,
-                    color = Color.Red,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily(Font(R.font.montserrat)), // Optional font customization
-                )
+                Button(
+                    onClick = { showResetDialog = true },
+                    colors = ButtonDefaults.buttonColors(Color.Red),
+                    enabled = !isResetting
+                ) {
+                    Text(
+                        text = "Reset Settings",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily(Font(R.font.montserrat))
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        val collection = collectionViewModel.collection.value
+                        if (collection?.monthName.isNullOrEmpty() || collection?.activeDays.isNullOrEmpty() || collection?.dailyFund == 0.0) {
+                            Toast.makeText(
+                                context,
+                                "Please complete all fields before saving.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            showSaveDialog = true
+                            collectionViewModel.saveCollection()
+                            navController.popBackStack()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(Color.Green),
+                    enabled = !isSaving
+                ) {
+                    Text(
+                        text = "Save Settings",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily(Font(R.font.montserrat))
+                    )
+                }
             }
         }
 
-        LaunchedEffect(key1 = errorMessage) {
-            kotlinx.coroutines.delay(2000) // Delay for 2 seconds
-            collectionViewModel.clearMessage()
+        // Error Message
+        errorMessage?.let {
+            ErrorMessage(it) { collectionViewModel.clearMessage() }
+        }
+
+        // Dialogs
+        if (showResetDialog) {
+            ConfirmationDialog(
+                title = "Reset Settings",
+                message = "Are you sure you want to reset the collection?",
+                onConfirm = {
+                    collectionViewModel.collection.value?.collectionId?.let { collectionId ->
+                        isResetting = true
+                        collectionViewModel.deleteCollection(collectionId)
+                        isResetting = false
+                    }
+                    showResetDialog = false
+                },
+                onDismiss = { showResetDialog = false }
+            )
+        }
+
+        if (showSaveDialog) {
+            InformationDialog(
+                title = "Save Settings",
+                message = "Collection settings saved successfully.",
+                onDismiss = { showSaveDialog = false }
+            )
         }
     }
 }
 
 @Composable
+fun EditableField(
+    isEditing: Boolean,
+    value: String,
+    label: String,
+    onValueChange: (String) -> Unit,
+    onEditToggle: (Boolean) -> Unit,
+    displayValue: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .shadow(elevation = 8.dp, shape = RoundedCornerShape(10.dp))
+            .background(Color(0xFFADEBB3))
+            .height(60.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isEditing) {
+            TextField(
+                value = value,
+                onValueChange = onValueChange,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                label = {
+                    Text(
+                        text = label,
+                        color = Color.Gray.copy(alpha = 0.5f),
+                        fontFamily = FontFamily(Font(R.font.inter)),
+                        fontSize = 12.sp) },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                ),
+                trailingIcon = {
+                    IconButton(onClick = { onEditToggle(false) }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_check),
+                            contentDescription = "Save",
+                            tint = Color.Red.copy(alpha = 0.7f),
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                }
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = displayValue,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily(Font(R.font.montserrat)),
+                    color = Color.Black
+                )
+                IconButton(onClick = { onEditToggle(true) }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.edit_text),
+                        contentDescription = "Edit Data",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ConfirmationDialog(title: String, message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = title) },
+        text = { Text(message) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Yes") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("No") } }
+    )
+}
+
+@Composable
+fun InformationDialog(title: String, message: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = title) },
+        text = { Text(message) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } }
+    )
+}
+
+@Composable
+fun ErrorMessage(message: String, onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .fillMaxWidth()
+            .background(Color(0xFFFFE5E5), shape = RoundedCornerShape(8.dp))
+            .padding(8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_error),
+                contentDescription = "Error Icon",
+                tint = Color.Red,
+                modifier = Modifier.size(16.dp).padding(end = 8.dp)
+            )
+            Text(
+                text = message,
+                color = Color.Red,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+
+    LaunchedEffect(message) {
+        kotlinx.coroutines.delay(2000)
+        onDismiss()
+    }
+}
+
+
+
+
+@Composable
 fun MonthSelectionBox(
     collectionViewModel: CollectionViewModel
 ) {
-    val selectedMonth by collectionViewModel.selectedMonthName.observeAsState("")
+
+    var selectedMonth by remember { mutableStateOf<String?>(null) } // Track selected month
+    var selectedDays by remember { mutableStateOf<List<String>>(emptyList()) }
     val months = listOf(
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -282,11 +324,7 @@ fun MonthSelectionBox(
 
     var expanded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedMonth) {
-        if (selectedMonth.isNotEmpty()) {
-            collectionViewModel.fetchMonthDetails(selectedMonth)
-        }
-    }
+
 
     Column(
         modifier = Modifier
@@ -302,10 +340,10 @@ fun MonthSelectionBox(
             // Dropdown Menu for selecting a month
             Box(modifier = Modifier.clickable { expanded = true }) {
                 Text(
-                    text = if (selectedMonth.isNotEmpty()) selectedMonth else "Select a month",
+                    text = selectedMonth ?: "Select a month",
                     fontSize = 16.sp,
                     fontFamily = FontFamily(Font(R.font.montserrat)),
-                    color = if (selectedMonth.isNotEmpty()) Color.Black else Color.Gray
+                    color = if (selectedMonth != null) Color.Black else Color.Gray
                 )
 
                 DropdownMenu(
@@ -322,7 +360,10 @@ fun MonthSelectionBox(
                             },
                             onClick = {
                                 expanded = false
-                                collectionViewModel.selectMonth(month) // Update ViewModel's selected month
+                                selectedMonth = month
+                                selectedDays = collectionViewModel.getActiveDaysForMonth(month) ?: emptyList()
+                                collectionViewModel.updateSelectedMonth(month, selectedDays)
+                                collectionViewModel.saveCollection()
                             }
                         )
                     }
@@ -339,17 +380,19 @@ fun MonthSelectionBox(
     }
 }
 
+
 @Composable
 fun CollectionBox(
-    collectionViewModel: CollectionViewModel,
-    navController: NavController
+    collectionViewModel: CollectionViewModel
 ) {
-    // Observe the selected month and month details
-    val monthDetails by collectionViewModel.monthDetailsLiveData.observeAsState(emptyList())
+    val collection by collectionViewModel.collection.observeAsState()
+    val monthDetails by collectionViewModel.monthDetails.observeAsState(emptyMap())
+    val selectedMonth = collection?.monthName
+    val activeDays = monthDetails[selectedMonth] ?: emptyList() // Retrieve active days for the selected month
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .height(280.dp)
             .background(Color(0xFFADEBB3), shape = RoundedCornerShape(16.dp))
     ) {
         Column(
@@ -357,78 +400,129 @@ fun CollectionBox(
                 .fillMaxSize()
                 .padding(horizontal = 10.dp, vertical = 10.dp)
         ) {
-            // Use the refactored MonthSelectionBox
+            // Display the MonthSelectionBox (for selecting a month)
             MonthSelectionBox(collectionViewModel)
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            if (monthDetails.isEmpty()) {
-                // Display Empty State
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No details added. Please select a month.",
-                        fontFamily = FontFamily(Font(R.font.montserrat)),
-                        fontSize = 16.sp,
-                        color = Color.Gray
-                    )
-                }
+            if (selectedMonth == null) {
+                // No month selected
+                Text(
+                    text = "No month selected. Please select a month.",
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
             } else {
-                // Display Month Details in LazyColumn
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(monthDetails) { month ->
-                        MonthDetailsRow(
-                            month = month,
-                            onAddActiveDay = { updatedDays ->
-                                collectionViewModel.updateActiveDays(month.monthName, updatedDays)
-                            }
-                        )
+                // Render MonthDetails regardless of whether activeDays is empty or not
+                MonthDetails(
+                    collectionViewModel,
+                    selectedMonth = selectedMonth,
+                    activeDays = activeDays,
+                    onAddActiveDay = { selectedDay ->
+                        collectionViewModel.editActiveDays(selectedMonth, selectedDay)
                     }
+                )
+
+                if (activeDays.isEmpty()) {
+                    // Display additional message if no active days are selected
+                    Text(
+                        text = "No active days selected for this month. Please select or add days.",
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
+    }
+}
 
-        // Static Row for buttons at the bottom
+@Composable
+fun MonthDetails(
+    collectionViewModel: CollectionViewModel,
+    selectedMonth: String?,
+    activeDays: List<String>,
+    onAddActiveDay: (List<String>) -> Unit
+) {
+    // If no month is selected, show a message and return
+    if (selectedMonth == null) {
+        Text(text = "No month details available.", color = Color.Red, modifier = Modifier.fillMaxWidth())
+        return
+    }
+
+    // Calculate monthly fund and active days count
+    val dailyFund = collectionViewModel.collection.value?.dailyFund ?: 0.0
+    val activeDaysCount = activeDays.size
+    val monthlyFund = activeDaysCount * dailyFund
+
+    // State for the multi-date picker dialog
+    var showDatePicker by remember { mutableStateOf(false) }
+    val selectedDates = remember { mutableStateListOf<String>().apply { addAll(activeDays) } }
+
+    // Show the multi-date picker dialog if needed
+    if (showDatePicker) {
+        MultiDatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            selectedDates = selectedDates,
+            onDatesSelected = { newDates ->
+                selectedDates.clear()
+                selectedDates.addAll(newDates)
+                onAddActiveDay(newDates) // Pass selected dates to the parent
+                showDatePicker = false
+            }
+        )
+    }
+
+    // Main content of the MonthDetails composable
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .background(Color(0xFFF5F5F5), shape = RoundedCornerShape(8.dp)),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Month, Amount, and Active Days
+        Text(
+            text = "Month: $selectedMonth",
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        Text(
+            text = "Estimated Amount: ${String.format("%.2f", monthlyFund)}",
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            fontFamily = FontFamily.Monospace,
+            color = Color.Blue
+        )
+        Text(
+            text = "Active Days: $activeDaysCount",
+            fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace
+        )
+
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter) // Align the buttons at the bottom
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Button(
-                onClick = { collectionViewModel.deleteCollection() },
-                colors = ButtonDefaults.buttonColors(Color.Red)
-            ) {
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ){
+            // Button to view active days
+            TextButton(onClick = { showDatePicker = true }) {
                 Text(
-                    text = "Reset Settings",
-                    fontSize = 11.sp,
+                    "View Active Days",
+                    color = Color.Blue,
                     fontFamily = FontFamily(Font(R.font.montserrat))
                 )
             }
 
-            Button(
-                onClick = {
-                    collectionViewModel.saveCollection()
-                    navController.navigate(Routes.dashboard) {
-                        popUpTo(Routes.fund) { inclusive = true }
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(Color.Red)
-            ) {
-                Text(
-                    text = "Save Settings",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily(Font(R.font.montserrat))
+            IconButton(onClick = { showDatePicker = true }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_calendar),
+                    contentDescription = "Calendar",
+                    tint = Color.Black,
+                    modifier = Modifier.size(50.dp)
                 )
             }
         }
@@ -437,66 +531,88 @@ fun CollectionBox(
 
 
 @Composable
-fun MonthDetailsRow(
-    month: Month?,
-    onAddActiveDay: (List<String>) -> Unit
+fun MultiDatePickerDialog(
+    onDismissRequest: () -> Unit,
+    selectedDates: List<String>,
+    onDatesSelected: (List<String>) -> Unit
 ) {
-    val context = LocalContext.current
+    // Keep track of selected dates in a mutable state
     val calendar = Calendar.getInstance()
+    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val daysList = (1..daysInMonth).toList()
+    val year = calendar.get(Calendar.YEAR)
+    val month = calendar.get(Calendar.MONTH) + 1
 
-    if (month == null) {
-        Text(text = "No month details available.", color = Color.Red)
-        return
-    }
+    val pickedDates = remember { mutableStateListOf<String>().apply { addAll(selectedDates) } }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF5F5F5), shape = RoundedCornerShape(8.dp))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                text = "Month: ${month.monthName}",
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                fontFamily = FontFamily.Monospace
-            )
-            Text(
-                text = "Estimated Amount: ${String.format("%.2f", month.monthlyFund)}",
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                fontFamily = FontFamily.Monospace,
-                color = Color.Blue
-            )
-            Text(
-                text = "Active Days: ${month.activeDays.size}",
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace
-            )
-        }
-        IconButton(onClick = {
-            android.app.DatePickerDialog(
-                context,
-                { _, year, monthOfYear, dayOfMonth ->
-                    val selectedDate = "$dayOfMonth/${monthOfYear + 1}/$year"
-                    val updatedActiveDays = month.activeDays.toMutableList().apply {
-                        add(selectedDate)
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Pick Dates",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(7), // 7 days in a week
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp) // Enough for multiple rows
+                ) {
+                    items(daysList){ day ->
+                        val dateString = "$day/$month/$year"
+                        val isPicked = pickedDates.contains(dateString)
+
+                        Box(
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(if (isPicked) Color.LightGray else Color.Transparent)
+                                .clickable {
+                                    if (isPicked) {
+                                        pickedDates.remove(dateString) // Unpick date
+                                    } else {
+                                        pickedDates.add(dateString) // Pick date
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = day.toString(),
+                                color = if (isPicked) Color.Black else Color.Gray
+                            )
+                        }
                     }
-                    onAddActiveDay(updatedActiveDays)
-                },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-            ).show()
-        }) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_calendar),
-                contentDescription = "Calendar",
-                tint = Color.Black
-            )
+                }
+                    Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Button(onClick = onDismissRequest) {
+                        Text(text = "Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            onDatesSelected(pickedDates.toList())
+                            onDismissRequest()
+                        }
+                    ) {
+                        Text(text = "Confirm")
+                    }
+                }
+            }
         }
     }
 }
+
+
+

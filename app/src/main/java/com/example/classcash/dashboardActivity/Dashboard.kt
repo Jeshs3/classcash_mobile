@@ -33,6 +33,7 @@ import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.addstudent.AddStudentViewModel
 import com.example.classcash.viewmodels.collection.CollectionViewModel
 import com.example.classcash.viewmodels.dashboard.DashboardViewModel
+import com.example.classcash.viewmodels.payment.PaymentViewModel
 import java.text.DecimalFormat
 
 
@@ -42,7 +43,8 @@ fun DashboardScreen(
     dashboardViewModel : DashboardViewModel,
     topScreenViewModel: TopScreenViewModel,
     addStudentViewModel: AddStudentViewModel,
-    collectionViewModel : CollectionViewModel
+    collectionViewModel : CollectionViewModel,
+    paymentViewModel : PaymentViewModel
 ) {
 
     val classSize by addStudentViewModel.classSize.collectAsState()
@@ -57,7 +59,7 @@ fun DashboardScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-            BalanceBox(navController, collectionViewModel)
+            BalanceBox(navController, collectionViewModel, paymentViewModel)
 
             HorizontalDivider(
                 color = Color(0xFFADEBB3),
@@ -109,7 +111,6 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(140.dp))
 
-        AddStudentsButton(navController)
         }
 }
 
@@ -117,22 +118,23 @@ fun DashboardScreen(
 @Composable
 fun BalanceBox(
     navController: NavController,
-    collectionViewModel : CollectionViewModel
+    collectionViewModel : CollectionViewModel,
+    paymentViewModel : PaymentViewModel
 ) {
 
-    val collectionSettings by collectionViewModel.collectionSettings.observeAsState()
+    //Class Balance
+    val classBalance by paymentViewModel.classBalance.observeAsState(initial = 0.0)
 
+    // Fetching collection settings from ViewModel
+    val collectionSettings by collectionViewModel.collection.observeAsState()
+
+    // Handling default values if collectionSettings or selectedMonth is null
     val duration = collectionSettings?.duration ?: 0
     val dailyFund = collectionSettings?.dailyFund ?: 0.0
+    val monthName = collectionSettings?.monthName ?: "No Month Selected"
+    val activeDaysCount = collectionSettings?.activeDays?.size ?: 0
+    val monthlyFund = collectionSettings?.monthlyFund ?: 0.0
 
-    val selectedMonth by collectionViewModel.selectedMonthDetails.observeAsState()
-
-    // Extract details from the selected month
-    val monthName = selectedMonth?.monthName ?: "No Month Selected"
-    val activeDaysCount = selectedMonth?.activeDays?.size ?: 0
-    val monthlyFund = selectedMonth?.monthlyFund ?: 0.0
-
-    val balance by remember { mutableDoubleStateOf(0.0) }
     var showDialog by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -152,7 +154,7 @@ fun BalanceBox(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "P ${String.format("%.2f", balance)}",
+                    text = "₱${String.format("%.2f", classBalance)}",
                     fontSize = 24.sp,
                     fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Bold)),
                     color = Color.Blue
@@ -229,28 +231,6 @@ fun BalanceBox(
         }
     }
 }
-
-@Composable
-fun AddStudentsButton(navController: NavController) {
-    Box(
-        modifier = Modifier
-            .padding(horizontal = 8.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color.Red)
-            .width(200.dp)
-            .height(50.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Add Students",
-            fontSize = 10.sp,
-            color = Color(0xFFFBFCFE),
-            fontFamily = FontFamily(Font(R.font.montserrat)),
-            modifier = Modifier.clickable { navController.navigate(Routes.studentadd) }
-        )
-    }
-}
-
 
 @Composable
 fun StudentsList(

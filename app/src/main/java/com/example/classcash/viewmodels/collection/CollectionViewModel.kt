@@ -1,195 +1,234 @@
 package com.example.classcash.viewmodels.collection
 
-import android.util.Log
+
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import android.util.Log
 
 
-class CollectionViewModel(private val repository: CollectionRepository) : ViewModel() {
+class CollectionViewModel(private val collectionRepository: CollectionRepository) : ViewModel() {
 
-    // Attributes to hold current collection settings
-    private val _collectionSettings = MutableLiveData<CollectionSettings>()
-    val collectionSettings: LiveData<CollectionSettings> get() = _collectionSettings
+    private val _collection = MutableLiveData<Collection>()
+    val collection: LiveData<Collection> get() = _collection
 
-    // Month details mapping and LiveData
-    private val monthDetailsMap = mutableMapOf<String, Month>()
-    private val _monthDetailsLiveData = MutableLiveData<List<Month>>()
-    val monthDetailsLiveData: LiveData<List<Month>> get() = _monthDetailsLiveData
+    private val monthDetailsMap = mutableMapOf<String, List<String>>() // Maps month name to active days
+    private val _monthDetails = MutableLiveData<Map<String, List<String>>>()
+    val monthDetails: LiveData<Map<String, List<String>>> get() = _monthDetails
 
-    private val _selectedMonthDetails = MutableLiveData<Month?>()
-    val selectedMonthDetails: LiveData<Month?> get() = _selectedMonthDetails
+    private val _selectedMonthName = MutableLiveData<String?>()
+    val selectedMonthName: LiveData<String?> get() = _selectedMonthName
 
-    // Extracted data properties for the selected month
-    val selectedMonthName: LiveData<String> = MediatorLiveData<String>().apply {
-        addSource(_selectedMonthDetails) { month ->
-            value = month?.monthName ?: ""
-        }
+    private val _message = MutableLiveData<MessageType>()
+    val message: LiveData<MessageType> get() = _message
+
+    sealed class MessageType {
+        data class Error(val message: String) : MessageType()
+        data class Info(val message: String) : MessageType()
     }
 
-    val selectedMonthlyFund: LiveData<Double> = MediatorLiveData<Double>().apply {
-        addSource(_selectedMonthDetails) { month ->
-            value = month?.monthlyFund ?: 0.0
-        }
-    }
-
-    val selectedActiveDays: LiveData<List<String>> = MediatorLiveData<List<String>>().apply {
-        addSource(_selectedMonthDetails) { month ->
-            value = month?.activeDays ?: emptyList()
-        }
-    }
-
-    // Error handling
-    private val _errorMessage = MutableLiveData<String>()
-    val errorMessage: LiveData<String> get() = _errorMessage
-
-    private val _infoMessage = MutableLiveData<String>()
-    val infoMessage: LiveData<String> get() = _infoMessage
 
     init {
-        // Initialize default settings
-        _collectionSettings.value = CollectionSettings(0, 0.0, "")
-        selectedMonthName.value?.let { fetchMonthDetails(it) }
+        Log.d("CollectionViewModel", "Initializing ViewModel...")
+        fetchCollectionSettings()
     }
 
-    // Save the collection
-    fun saveCollection() {
-        val settings = _collectionSettings.value
-        val selectedMonth = _selectedMonthDetails.value
-        if (settings != null && selectedMonth != null) {
-            val collection = Collection(
-                collectionId = generateCollectionId(),
-                dailyFund = settings.dailyFund,
-                duration = settings.duration,
-                month = selectedMonth,
-                activeDays = selectedMonth.activeDays,
-                monthlyFund = selectedMonth.monthlyFund
-            )
+
+    fun updateDuration(input: String) {
+        Log.d("CollectionViewModel", "Updating duration: $input")
+        val durationValue = input.toIntOrNull()
+        if (durationValue != null && durationValue > 0) {
+            _collection.value = _collection.value?.copy(duration = durationValue)
+            saveData()
+        } else {
+            handleError("Invalid duration")
+        }
+    }
+
+    fun updateDailyFund(input: String) {
+        Log.d("CollectionViewModel", "Updating daily fund: $input")
+        val dailyFundValue = input.toDoubleOrNull()
+        if (dailyFundValue != null && dailyFundValue > 0) {
+            _collection.value = _collection.value?.copy(dailyFund = dailyFundValue)
+            saveData()
+        } else {
+            handleError("Invalid daily fund")
+        }
+    }
+
+    fun updateSelectedMonth(month: String, selectedDays: List<String>) {
+        Log.d("CollectionViewModel", "Updating selected month: $month with active days: $selectedDays")
+
+        // Update the main collection state
+        _collection.value = _collection.value?.copy(monthName = month) ?: Collection(monthName = month)
+
+        // Safely handle nullable _monthDetails.value
+        val newMonthDetails = (_monthDetails.value?.toMutableMap() ?: mutableMapOf()).apply {
+            this[month] = selectedDays
+        }
+        _monthDetails.value = newMonthDetails
+
+        Log.d("CollectionViewModel", "Updated month details: $newMonthDetails")
+
+        // Call editActiveDays if needed
+        editActiveDays(month, selectedDays)
+        saveData()
+    }
+
+    fun editActiveDays(monthName: String, selectedDays: List<String>) {
+        Log.d("CollectionViewModel", "Editing active days for $monthName: $selectedDays")
+
+        // Get current active days for the selected month
+        val activeDays = monthDetailsMap[monthName] ?: emptyList()
+
+        // Update active days (either add or remove the selected days)
+        val updatedActiveDays = activeDays.toMutableList()
+
+        selectedDays.forEach { selectedDay ->
+            if (updatedActiveDays.contains(selectedDay)) {
+                updatedActiveDays.remove(selectedDay) // Remove the day if it exists
+            } else {
+                updatedActiveDays.add(selectedDay) // Add the day if it doesn't exist
+            }
+        }
+
+        // Update the collection with the modified active days
+        updateActiveDays(monthName, updatedActiveDays)
+
+        // Also update the monthDetailsMap to ensure consistency
+        monthDetailsMap[monthName] = updatedActiveDays
+
+        // Update _monthDetails LiveData to reflect the new state
+        _monthDetails.value = monthDetailsMap
+    }
+
+    fun updateActiveDays(monthName: String, updatedDays: List<String>) {
+        Log.d("CollectionViewModel", "Updating active days for $monthName: $updatedDays")
+
+        // Update the activeDays and monthlyFund in the collection object
+        _collection.value = _collection.value?.let { currentCollection ->
+            if (currentCollection.monthName == monthName) {
+                currentCollection.copy(
+                    activeDays = updatedDays,
+                    monthlyFund = updatedDays.size * (currentCollection.dailyFund ?: 0.0)
+                )
+            } else {
+                currentCollection
+            }
+        }
+    }
+
+    // Function to get active days for a specific month
+    fun getActiveDaysForMonth(month: String): List<String>? {
+        val currentMonthDetails = _monthDetails.value ?: return null
+        return currentMonthDetails[month]
+    }
+
+    fun updateMonthlyFund(selectedMonth: String) {
+        val dailyFund = collection.value?.dailyFund ?: 0.0
+        val activeDays = monthDetails.value?.get(selectedMonth)?.size ?: 0
+        val updatedFund = dailyFund * activeDays
+        _collection.value = collection.value?.copy(monthlyFund = updatedFund)
+    }
+
+    private fun handleError(message: String) {
+        Log.e("CollectionViewModel", "Error: $message")
+        _message.value = MessageType.Error(message)
+    }
+
+    fun fetchCollectionSettings() {
+        Log.d("CollectionViewModel", "Fetching collection settings...")
+        val collectionId = _collection.value?.collectionId?.plus(1) ?: 1
+        viewModelScope.launch {
+            try {
+                val collection = collectionRepository.getCollectionById(collectionId) // Fetch single collection
+                if (collection != null) {
+                    _collection.value = collection // Update LiveData with fetched collection
+                    Log.d("CollectionViewModel", "Fetched collection settings: ${_collection.value}")
+                } else {
+                    handleError("No collection found with ID: $collectionId") // Handle case when no collection exists
+                }
+            } catch (e: Exception) {
+                handleError("Failed to load collection: ${e.message}") // Handle exceptions
+            }
+        }
+    }
+
+    private fun saveData() {
+        Log.d("CollectionViewModel", "Saving collection data...")
+        val collectionData = _collection.value
+        if (collectionData != null) {
             viewModelScope.launch {
-                val isSuccess = repository.saveCollection(collection)
-                if (!isSuccess) {
-                    _errorMessage.value = "Failed to save collection"
+                try {
+                    val isSuccess = collectionRepository.saveCollection(collectionData)
+                    if (isSuccess) {
+                        Log.d("CollectionViewModel", "Collection data saved successfully to Firestore.")
+                    } else {
+                        handleError("Failed to save collection data.")
+                    }
+                } catch (e: Exception) {
+                    handleError("Failed to save collection data: ${e.message}")
                 }
             }
         } else {
-            _errorMessage.value = "Collection settings or selected month are incomplete"
+            handleError("Collection data is null, cannot save.")
         }
     }
 
-    // Update duration
-    fun updateDuration(input: String) {
-        // Check if the input contains any non-digit characters except for an optional leading minus sign
-        if (input.isEmpty()) {
-            _errorMessage.value = "Duration cannot be empty"
-            return
-        }
-
-        // Validate if input contains only digits
-        val filteredInput = input.filter { it.isDigit() }
-        if (filteredInput.isEmpty()) {
-            _errorMessage.value = "Duration must be a valid number"
-            return
-        }
-
-        // Convert the filtered input to an integer
-        val durationValue = filteredInput.toIntOrNull()
-
-        // If the duration value is null or less than or equal to zero, it's invalid
-        if (durationValue == null || durationValue <= 0) {
-            _errorMessage.value = "Invalid duration"
+    fun saveCollection() {
+        Log.d("CollectionViewModel", "Saving collection...")
+        val settings = _collection.value
+        if (settings != null) {
+            viewModelScope.launch {
+                val isSuccess = collectionRepository.saveCollection(settings)
+                if (isSuccess) {
+                    Log.d("CollectionViewModel", "Collection saved successfully")
+                } else {
+                    handleError("Failed to save collection")
+                }
+            }
         } else {
-            // Valid duration, update collection settings
-            _collectionSettings.value = _collectionSettings.value?.copy(duration = durationValue)
-            _errorMessage.value = "" // Clear any error message
+            handleError("Collection settings are incomplete")
         }
     }
 
 
-    // Update daily fund
-    fun updateDailyFund(input: String) {
-        val filteredInput = input.filter { it.isDigit() || it == '.' }
-        val dailyFundValue = filteredInput.toDoubleOrNull() ?: 0.0
-        if (dailyFundValue > 0) {
-            _collectionSettings.value = _collectionSettings.value?.copy(dailyFund = dailyFundValue)
-        } else {
-            _errorMessage.value = "Invalid daily fund"
-        }
-    }
-
-    // Update the active days for a selected month
-    fun updateActiveDays(monthName: String, updatedDays: List<String>) {
-        val month = monthDetailsMap[monthName]
-        if (month != null) {
-            val updatedMonth = month.copy(activeDays = updatedDays)
-            monthDetailsMap[monthName] = updatedMonth
-            updateMonthDetailsLiveData()
-            Log.d("ViewModel", "Updated active days for $monthName: ${updatedDays.size}")
-        }
-    }
-
-    // Select a month and initialize active days
-    private fun updateMonthDetailsLiveData() {
-        _monthDetailsLiveData.value = monthDetailsMap.values.toList()
-    }
-
-    fun fetchMonthDetails(monthName: String) {
+    fun deleteCollection(collectionId: Int) {
         viewModelScope.launch {
-            val monthFromRepo = repository.fetchMonthObject(monthName)
-            if (monthFromRepo != null) {
-                val mappedMonth = Month(
-                    monthName = monthName,
-                    activeDays = monthFromRepo.activeDays,
-                    monthlyFund = monthFromRepo.monthlyFund
-                )
-                monthDetailsMap[monthName] = mappedMonth
-                updateMonthDetailsLiveData()
+            try {
+                Log.d("CollectionViewModel", "Initiating deletion for collection ID: $collectionId")
+
+                // Attempt to delete the collection from the repository
+                val success = collectionRepository.deleteCollectionSettings(collectionId)
+
+                if (success) {
+                    // If deletion is successful, reset the local state
+                    _collection.value = _collection.value?.copy(
+                        monthName = "",  // Clear the month name
+                        activeDays = emptyList(),  // Clear the list of active days
+                        dailyFund = 0.0,  // Reset the daily fund to zero
+                        duration = 0,
+                        monthlyFund = 0.0  // Reset the monthly fund to zero
+                    )
+
+                    Log.d("CollectionViewModel", "Successfully deleted collection data.")
+                } else {
+                    Log.e("CollectionViewModel", "Failed to delete collection from the repository.")
+                    handleError("Failed to delete collection. Please try again.")
+                }
+            } catch (e: Exception) {
+                Log.e("CollectionViewModel", "Error occurred while deleting collection", e)
+                handleError("An error occurred while deleting the collection.")
             }
         }
     }
 
-    fun selectMonth(monthName: String) {
-        val existingMonth = monthDetailsMap[monthName]
-        if (existingMonth != null) {
-            _selectedMonthDetails.value = existingMonth
-            updateMonthDetailsLiveData()
-        } else {
-            val newMonth = Month(monthName, emptyList(), 0.0)
-            monthDetailsMap[monthName] = newMonth
-            _selectedMonthDetails.value = newMonth
-            updateMonthDetailsLiveData()
-        }
-    }
-
-    // Initialize months
-    fun initializeMonths(monthNames: List<String>) {
-        monthDetailsMap.clear()
-        monthNames.forEach { monthName ->
-            monthDetailsMap[monthName] = Month(monthName, emptyList(), 0.0)
-        }
-        _monthDetailsLiveData.value = monthDetailsMap.values.toList()
-    }
-
-    fun deleteCollection() {
-        // Reset the collection settings to default values
-        _collectionSettings.value = CollectionSettings(0, 0.0, "")
-
-        // Optionally, clear other state values related to the collection
-        _selectedMonthDetails.value = null
-        _errorMessage.value = ""
-
-        // Inform observers that the collection has been deleted
-        _infoMessage.value = "Collection has been successfully deleted"
-    }
 
 
-    // Generate collection ID
-    private fun generateCollectionId(): Int = (1..1000).random()
-
-    fun clearMessage(){
-        _errorMessage.value = ""
+    fun clearMessage() {
+        Log.d("CollectionViewModel", "Clearing message")
+        _message.value = MessageType.Info("No message")
     }
 }
-

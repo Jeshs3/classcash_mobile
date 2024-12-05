@@ -12,31 +12,10 @@ class PaymentRepository {
     private val notificationsCollection = firestore.collection("notifications")
     private val classBalanceDocument = firestore.collection("classBalance").document("currentBalance")
 
-    suspend fun getStudentById(studentId: Int): Student? {
-        return try {
-            val studentDocId = "student_$studentId"  // Constructing document ID like "student_1"
-            val document = studentsCollection.document(studentDocId).get().await()
 
-            if (!document.exists()) {
-                Log.w("PaymentRepository", "Student with ID $studentId (Doc ID: $studentDocId) not found")
-                return null
-            }
-
-            document.toObject(Student::class.java)?.copy(studentId = studentId) ?: run {
-                Log.e("PaymentRepository", "Error mapping document for student ID $studentId (Doc ID: $studentDocId)")
-                null
-            }
-
-        } catch (e: Exception) {
-            Log.e("PaymentRepository", "Error fetching student by ID $studentId", e)
-            null
-        }
-    }
-
-    // Record a payment and update the student balance
     suspend fun recordPayment(studentId: Int, amount: Double): Boolean {
         return try {
-            firestore.runTransaction { transaction ->
+            val updateResult = firestore.runTransaction { transaction ->
                 val docRef = studentsCollection.document("student_$studentId")
                 val snapshot = transaction.get(docRef)
 
@@ -48,24 +27,58 @@ class PaymentRepository {
                 val student = snapshot.toObject(Student::class.java)
                     ?: throw Exception("Error parsing student data")
 
-                Log.d("recordPayment", "Student before update: $student")
-
                 val updatedBalance = student.currentBal + amount
-                val updatedLogs = student.transactionLogs + Student.TransactionLog(amount, getCurrentDate())
-
-                Log.d("recordPayment", "Updated balance: $updatedBalance")
-                Log.d("recordPayment", "Updated logs: $updatedLogs")
-
                 transaction.update(docRef, mapOf(
-                    "currentBal" to updatedBalance,
-                    "transactionLogs" to updatedLogs
+                    "currentBal" to updatedBalance
                 ))
+
+                // Return student data for logging
+                student
             }.await()
+
+            // Add log entry after transaction
+            if (updateResult != null) {
+                addTransactionLog(studentId, amount)
+            }
+
             true
         } catch (e: Exception) {
             Log.e("recordPayment", "Error recording payment transaction", e)
-            e.printStackTrace()
             false
+        }
+    }
+
+    private suspend fun addTransactionLog(studentId: Int, amount: Double): Boolean {
+        return try {
+            val logEntry = Student.TransactionLog(amount, getCurrentDate())
+            studentsCollection.document("student_$studentId").update(mapOf(
+                "transactionLogs" to (getStudentById(studentId)?.transactionLogs ?: emptyList()) + logEntry
+            ))
+            true
+        } catch (e: Exception) {
+            Log.e("addTransactionLog", "Error adding transaction log", e)
+            false
+        }
+    }
+
+    // Helper function to get student by ID
+   suspend fun getStudentById(studentId: Int): Student? {
+        return try {
+            val studentDocId = "student_$studentId"
+            val document = studentsCollection.document(studentDocId).get().await()
+
+            if (!document.exists()) {
+                Log.w("PaymentRepository", "Student with ID $studentId (Doc ID: $studentDocId) not found")
+                null
+            }
+
+            document.toObject(Student::class.java)?.copy(studentId = studentId) ?: run {
+                Log.e("PaymentRepository", "Error mapping document for student ID $studentId (Doc ID: $studentId)")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("PaymentRepository", "Error fetching student by ID $studentId", e)
+            null
         }
     }
 
@@ -95,7 +108,6 @@ class PaymentRepository {
                 mapOf(
                     "currentBal" to student.currentBal,
                     "transactionLogs" to student.transactionLogs
-                    // Add other fields you want to update
                 )
             ).await()
             true
@@ -121,3 +133,4 @@ class PaymentRepository {
         return dateFormat.format(java.util.Date())
     }
 }
+

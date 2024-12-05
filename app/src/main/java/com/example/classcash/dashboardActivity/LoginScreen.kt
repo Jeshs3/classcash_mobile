@@ -240,7 +240,7 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                                 }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Blue),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(40.dp)
@@ -267,7 +267,7 @@ fun LoginScreen(authViewModel: AuthViewModel, onNavigateToDashboard: () -> Unit)
                         Text(
                             text = if(loginMode) "Switch to Register" else "Switch to Login",
                             fontSize = 15.sp,
-                            color = Color.Red,
+                            color = Color.Blue,
                             fontFamily = FontFamily(Font(R.font.montserrat))
                         )
                     }

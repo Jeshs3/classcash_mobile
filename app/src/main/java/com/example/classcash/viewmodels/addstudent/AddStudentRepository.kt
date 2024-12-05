@@ -1,5 +1,6 @@
 package com.example.classcash.viewmodels.addstudent
 
+import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -62,6 +63,10 @@ class StudentRepository(private val db: FirebaseFirestore) {
                 val studentMap = snapshot.documents.associate { doc ->
                     val studentId = doc.getLong("studentId")?.toInt() ?: 0
                     val studentName = doc.getString("studentName") ?: ""
+                    val targetAmt = doc.getDouble("targetAmt") ?: 0.0
+                    val currentBal = doc.getDouble("currentBal") ?: 0.0
+                    val progress = doc.getDouble("progress") ?: 0.0
+                    val transactionLogs = doc.get("transactionLogs") as? List<Map<String, Any>> ?: emptyList()
                     studentId to studentName
                 }
                 trySend(studentMap).isSuccess
@@ -96,8 +101,21 @@ class StudentRepository(private val db: FirebaseFirestore) {
 
             val students = snapshot?.documents?.mapIndexed { index, doc ->
                 val studentName = doc.getString("studentName") ?: "Unknown"
-                val studentId = doc.getLong("studentId")?.toInt() ?: (index + 1) // Ensure fallback ID
-                StudentWarehouse.createStudent(studentId = studentId, studentName = studentName)
+                val studentId = doc.getLong("studentId")?.toInt() ?: (index + 1)
+                val targetAmt = doc.getDouble("targetAmt") ?: 0.0
+                val currentBal = doc.getDouble("currentBal") ?: 0.0
+
+                // Create the student with the calculated progress
+                StudentWarehouse.createStudent(
+                    studentId = studentId,
+                    studentName = studentName,
+                    targetAmt = targetAmt,
+                    currentBal = currentBal
+                )
+            }?.onEach { student ->
+                // Log progress for debugging purposes
+                val progress = student.calculateProgress()
+                Log.d("StudentProgress", "Student: ${student.studentName}, Progress: $progress%")
             } ?: emptyList()
 
             trySend(students).isSuccess // Emit the updated list

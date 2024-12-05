@@ -1,5 +1,6 @@
 package com.example.classcash.viewmodels.treasurer
 
+import android.net.Uri
 import android.util.Patterns
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -9,12 +10,15 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 
 class AuthViewModel : ViewModel() {
 
     var name = mutableStateOf("")
     var email = mutableStateOf("")
     var password = mutableStateOf("")
+    var profileImageUrl = mutableStateOf("")
+    var classroomName = mutableStateOf("No Classroom Found")
 
     private val _errorMessage = mutableStateOf<String?>(null)
     val errorMessage: State<String?> get() = _errorMessage
@@ -56,7 +60,13 @@ class AuthViewModel : ViewModel() {
                     val userId = auth.currentUser?.uid
                     if (userId != null) {
                         FirebaseFirestore.getInstance().collection("users").document(userId)
-                            .set(mapOf("name" to name.value, "email" to email.value))
+                            .set(mapOf(
+                                "name" to name.value,
+                                "email" to email.value,
+                                "password" to password.value,
+                                "classroomName" to classroomName.value,
+                                "profileImageUrl" to profileImageUrl.value
+                            ))
                             .addOnSuccessListener {
                                 _successMessage.value = "Registration successful. Welcome!"
                                 login(onSuccess, onFailure) // Automatically log in after registration
@@ -81,6 +91,10 @@ class AuthViewModel : ViewModel() {
         auth.signInWithEmailAndPassword(email.value, password.value)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
+                    val userId = auth.currentUser?.uid
+                    if (userId != null) {
+                        fetchTreasurerName(userId)
+                    }
                     _successMessage.value = "Login successful!"
                     onSuccess()
                 } else {
@@ -102,6 +116,27 @@ class AuthViewModel : ViewModel() {
         clearMessages()
     }
 
+    fun fetchTreasurerName(userId: String) {
+        FirebaseFirestore.getInstance().collection("users").document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val fetchedName = document.getString("name") ?: "No Name Found"
+                    name.value = fetchedName
+                    val fetchedProfileImageUrl = document.getString("profileImageUrl") ?: ""
+                    name.value = fetchedName
+                    profileImageUrl.value = fetchedProfileImageUrl
+                } else {
+                    name.value = "No Name Found"
+                    profileImageUrl.value = "No profile photo"
+                }
+            }
+            .addOnFailureListener {
+                name.value = "Failed to retrieve name"
+                profileImageUrl.value = "Failed to retrieve image"
+            }
+    }
+
     // Input field change handlers
     fun onNameChange(newName: String) {
         name.value = newName
@@ -115,11 +150,6 @@ class AuthViewModel : ViewModel() {
         password.value = newPassword
     }
 
-    // Utility to retrieve treasurer's name
-    fun getTreasurerName(): String {
-        return if (name.value.isBlank()) "No Name Found" else name.value
-    }
-
     // Clear both error and success messages
     fun clearMessages() {
         _errorMessage.value = null
@@ -131,5 +161,26 @@ class AuthViewModel : ViewModel() {
         name.value = ""
         email.value = ""
         password.value = ""
+    }
+
+    //Profile Image
+    fun uploadProfileImage(uri: Uri, onUploadSuccess: (String) -> Unit, onUploadFailure: (String) -> Unit) {
+        val storageReference =
+            FirebaseStorage.getInstance().reference.child("profile_images/${auth.currentUser?.uid}.jpg")
+
+        storageReference.putFile(uri)
+            .addOnSuccessListener {
+                storageReference.downloadUrl
+                    .addOnSuccessListener { downloadUri ->
+                        profileImageUrl.value = downloadUri.toString()
+                        onUploadSuccess(downloadUri.toString())
+                    }
+                    .addOnFailureListener { e ->
+                        onUploadFailure(e.message ?: "Failed to retrieve image URL")
+                    }
+            }
+            .addOnFailureListener { e ->
+                onUploadFailure(e.message ?: "Image upload failed")
+            }
     }
 }

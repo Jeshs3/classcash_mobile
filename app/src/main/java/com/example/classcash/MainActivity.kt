@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -40,8 +39,10 @@ import com.example.classcash.recyclable.TopScreenB
 import com.example.classcash.viewmodels.addstudent.AddStudentViewModel
 import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.addstudent.AddStudentViewModelFactory
+import com.example.classcash.viewmodels.addstudent.Student
+import com.example.classcash.viewmodels.addstudent.Student.TransactionLog
 import com.example.classcash.viewmodels.addstudent.StudentRepository
-import com.example.classcash.viewmodels.collection.CollectionRepositoryImpl
+import com.example.classcash.viewmodels.collection.CollectionRepository
 import com.example.classcash.viewmodels.collection.CollectionViewModel
 import com.example.classcash.viewmodels.collection.CollectionViewModelFactory
 import com.example.classcash.viewmodels.dashboard.DashboardViewModel
@@ -49,13 +50,13 @@ import com.example.classcash.viewmodels.dashboard.DashboardViewModelFactory
 import com.example.classcash.viewmodels.event.AddEventViewModel
 import com.example.classcash.viewmodels.event.AddEventViewModelFactory
 import com.example.classcash.viewmodels.event.EventRepository
+import com.example.classcash.viewmodels.notifications.NotificationsRepository
+import com.example.classcash.viewmodels.notifications.NotificationsViewModel
+import com.example.classcash.viewmodels.notifications.NotificationsViewModelFactory
 import com.example.classcash.viewmodels.payment.PaymentRepository
 import com.example.classcash.viewmodels.payment.PaymentViewModel
 import com.example.classcash.viewmodels.payment.PaymentViewModelFactory
 import com.example.classcash.viewmodels.treasurer.AuthViewModel
-import com.example.classcash.viewmodels.treasurer.ProfileRepository
-import com.example.classcash.viewmodels.treasurer.ProfileViewModel
-import com.example.classcash.viewmodels.treasurer.ProfileViewModelFactory
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -89,15 +90,11 @@ fun ClassCash() {
 
     val firebaseFirestore = FirebaseFirestore.getInstance()
     val studentRepository = StudentRepository(firebaseFirestore)
+    val collectionRepository = CollectionRepository(firebaseFirestore)
 
     val addStudentViewModel: AddStudentViewModel = viewModel(
         factory = AddStudentViewModelFactory(studentRepository)
     )
-
-    // Profile
-    val profileRepository = ProfileRepository(authViewModel, topScreenViewModel)
-    val profileViewModelFactory = ProfileViewModelFactory(profileRepository)
-    val profileViewModel: ProfileViewModel = viewModel(factory = profileViewModelFactory)
 
     // Event Management
     val eventRepository = EventRepository()
@@ -105,15 +102,19 @@ fun ClassCash() {
     val eventViewModel: AddEventViewModel = viewModel(factory = eventViewModelFactory)
 
     // Fund Setup
-    val collectionRepository = CollectionRepositoryImpl()
-    val collectionViewModelFactory = CollectionViewModelFactory(collectionRepository)
-    val collectionViewModel: CollectionViewModel = viewModel(factory = collectionViewModelFactory)
+    val collectionViewModel : CollectionViewModel = viewModel(
+        factory = CollectionViewModelFactory(collectionRepository)
+    )
 
     //Payment
     val paymentRepository = PaymentRepository()
     val paymentViewModelFactory = PaymentViewModelFactory(paymentRepository)
     val paymentViewModel : PaymentViewModel = viewModel(factory = paymentViewModelFactory)
 
+
+    //val notificationsRepository = NotificationsRepository()
+    //val notificationsViewModelFactory = NotificationsViewModelFactory(notificationsRepository)
+    //val notificationsViewModel : NotificationsViewModel = viewModel(factory = notificationsViewModelFactory)
 
     val dashboardViewModel: DashboardViewModel = viewModel(
         factory = DashboardViewModelFactory(studentRepository, paymentRepository)
@@ -198,7 +199,8 @@ fun ClassCash() {
                             dashboardViewModel,
                             topScreenViewModel,
                             addStudentViewModel,
-                            collectionViewModel
+                            collectionViewModel,
+                            paymentViewModel
                         )
                     }
                     composable(Routes.event) {
@@ -237,9 +239,12 @@ fun ClassCash() {
                     composable(Routes.trview) {
                         TransactionView(navController)
                     }
-                    composable(Routes.notification) {
-                        Notifications(navController)
-                    }
+                    /*composable(Routes.notification) {
+                        Notifications(
+                            navController,
+                            notificationsViewModel
+                        )
+                    }*/
                     composable(Routes.pbox) { backStackEntry ->
                         // Extract `studentId` from the navigation arguments or pass it directly
                         val studentId = backStackEntry.arguments?.getString("studentId")?.toIntOrNull() ?: 0
@@ -263,7 +268,8 @@ fun ClassCash() {
                     composable(Routes.profile) {
                         ProfileScreen(
                             navController,
-                            profileViewModel
+                            authViewModel,
+                            topScreenViewModel
                         )
                     }
                     composable(Routes.files) {
