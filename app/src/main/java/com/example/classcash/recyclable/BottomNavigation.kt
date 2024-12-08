@@ -1,7 +1,5 @@
 package com.example.classcash.recyclable
 
-
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,13 +53,14 @@ fun BottomNavigationBar(navController: NavController) {
     ) {
         // Create a NavigationBarItem for each screen
         items.forEach { screen ->
+            val isSelected = currentRoute == screen.route
             NavigationBarItem(
-                selected = currentRoute == screen.route,
+                selected = isSelected,
                 onClick = {
-                    if (currentRoute != screen.route) {
+                    if (!isSelected) {
                         navController.navigate(screen.route) {
                             launchSingleTop = true
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            popUpTo(Routes.dashboard) { inclusive = false }
                             restoreState = true
                         }
                     }

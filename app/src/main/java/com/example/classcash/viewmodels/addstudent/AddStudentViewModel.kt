@@ -2,10 +2,16 @@ package com.example.classcash.viewmodels.addstudent
 
 import android.util.Log
 import androidx.lifecycle.*
+import com.example.classcash.viewmodels.payment.PaymentRepository
+import com.opencsv.CSVReader
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.FileReader
 
-class AddStudentViewModel(private val repository: StudentRepository) : ViewModel() {
+class AddStudentViewModel(
+    private val repository: StudentRepository,
+    private val paymentRepository: PaymentRepository
+) : ViewModel() {
 
     sealed class UiState {
         object Idle : UiState()
@@ -24,6 +30,9 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
 
     private val _classSize = MutableStateFlow(0)
     val classSize: StateFlow<Int> = _classSize
+
+    private val _classBalance = MutableStateFlow(0.0)
+    val classBalance: StateFlow<Double> = _classBalance
 
     init {
         fetchStudentNames()
@@ -126,6 +135,7 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
             if (result.isSuccess) {
                 if (clearFields) _studentNames.value = listOf()
                 updateClassSize()
+                resetClassBalance()
                 UiState.Success("All students deleted successfully")
             } else {
                 UiState.Error("Failed to delete students: ${result.exceptionOrNull()?.message}")
@@ -133,6 +143,35 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
         }
     }
 
+    fun import(filePath: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = UiState.Loading
+
+                // Read the CSV file
+                val reader = CSVReader(FileReader(filePath))
+                val records = reader.readAll()
+
+                // Process each row and add student names
+                val importedStudents = records.drop(1) // Skip the header
+                    .mapNotNull { row ->
+                        if (row.isNotEmpty() && row[0].isNotBlank()) row[0].trim() else null
+                    }
+
+                // Update the student names, avoiding duplicates
+                val uniqueStudents = (importedStudents + _studentNames.value).distinct()
+                _studentNames.value = uniqueStudents
+                updateClassSize()
+
+                _uiState.value = UiState.Success("Students imported successfully")
+                Log.d("AddStudentViewModel", "Imported students: $importedStudents")
+
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error("Failed to import students: ${e.message}")
+                Log.e("AddStudentViewModel", "Error importing students", e)
+            }
+        }
+    }
     private fun fetchStudentNames() {
         viewModelScope.launch {
             repository.fetchStudentNames()
@@ -154,5 +193,26 @@ class AddStudentViewModel(private val repository: StudentRepository) : ViewModel
     }
     private fun generateNewStudentId(): Int {
         return (_studentNames.value.size + 1) // Example: Incremental ID
+    }
+
+    // Assuming PaymentRepository has a method to fetch the balance
+    fun fetchClassBalance() {
+        viewModelScope.launch {
+            val balance = paymentRepository.getClassBalance() ?: 0.0
+            _classBalance.value = balance
+            Log.d("AddStudentViewModel", "Fetched class balance: $balance")
+        }
+    }
+
+    private fun resetClassBalance() {
+        viewModelScope.launch {
+            val success = paymentRepository.deleteClassBalance()
+            if (success) {
+                _classBalance.value = 0.0
+                Log.d("resetClassBalanceAfterDelete", "Class balance reset successfully after student deletion")
+            } else {
+                Log.e("resetClassBalanceAfterDelete", "Failed to reset class balance after student deletion")
+            }
+        }
     }
 }

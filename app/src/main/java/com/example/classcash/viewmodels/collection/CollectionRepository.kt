@@ -2,17 +2,31 @@ package com.example.classcash.viewmodels.collection
 
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class CollectionRepository(private val db: FirebaseFirestore) {
 
     suspend fun saveCollection(collection: Collection): Boolean {
         return try {
-            val docRef = db.collection("fundsetting").document("fund_${collection.collectionId}")
+            // Fetch the highest current collectionId
+            val lastDocument = db.collection("fundsetting")
+                .orderBy("collectionId", Query.Direction.DESCENDING)
+                .limit(1)
+                .get()
+                .await()
+                .documents.firstOrNull()
+
+            val nextId = (lastDocument?.getLong("collectionId")?.toInt() ?: 0) + 1
+
+            val docRef = db.collection("fundsetting").document("fund_$nextId")
             val calculatedMonthlyFund = collection.calculateMonthlyFund()
 
             val collectionData = mapOf(
-                "collectionId" to collection.collectionId,
+                "collectionId" to nextId,
                 "dailyFund" to collection.dailyFund,
                 "duration" to collection.duration,
                 "monthName" to collection.monthName,
@@ -22,44 +36,65 @@ class CollectionRepository(private val db: FirebaseFirestore) {
 
             Log.d("CollectionRepository", "Saving collection: $collectionData")
             docRef.set(collectionData).await()
-            Log.d("CollectionRepository", "Successfully saved collection with ID: ${collection.collectionId}")
+            Log.d("CollectionRepository", "Successfully saved collection with ID: $nextId")
             true
         } catch (e: Exception) {
-            Log.e("CollectionRepository", "Error saving collection: ${collection.collectionId}", e)
+            Log.e("CollectionRepository", "Error saving collection", e)
             false
         }
     }
 
-    suspend fun getCollectionById(collectionId: Int): Collection? {
-        return try {
-            Log.d("CollectionRepository", "Fetching collection by ID: $collectionId")
-            val documentSnapshot = db.collection("fundsetting").document("fund_$collectionId").get().await()
-            val collectionData = documentSnapshot.data
-            collectionData?.let {
-                Collection(
-                    collectionId = (it["collectionId"] as? Number)?.toInt() ?: 0,
-                    dailyFund = (it["dailyFund"] as? Number)?.toDouble() ?: 0.0,
-                    duration = (it["duration"] as? Number)?.toInt() ?: 0,
-                    monthName = it["monthName"] as? String ?: "",
-                    activeDays = it["activeDays"] as? List<String> ?: emptyList(),
-                    monthlyFund = (it["monthlyFund"] as? Number)?.toDouble() ?: 0.0
-                )
+    fun fetchCollectionSettings(): Flow<Collection> = callbackFlow {
+        val listener = db.collection("fundsetting").addSnapshotListener { snapshot, exception ->
+            if (exception != null) {
+                close(exception) // Close the flow if an error occurs
+                return@addSnapshotListener
             }
-        } catch (e: Exception) {
-            Log.e("CollectionRepository", "Error fetching collection by ID: $collectionId", e)
-            null
+
+            if (snapshot != null && !snapshot.isEmpty) {
+                // Assuming the settings correspond to a single document in "fundsetting"
+                val document = snapshot.documents.firstOrNull() // Fetch the first document
+                if (document != null) {
+                    val collectionId = document.getLong("collectionId")?.toInt() ?: 0
+                    val dailyFund = document.getDouble("dailyFund") ?: 0.0
+                    val duration = document.getLong("duration")?.toInt() ?: 0
+                    val monthName = document.getString("monthName") ?: ""
+                    val activeDays = document.get("activeDays") as? List<String> ?: emptyList()
+                    val monthlyFund = document.getDouble("monthlyFund") ?: 0.0
+
+                    val collection = Collection(
+                        collectionId = collectionId,
+                        dailyFund = dailyFund,
+                        duration = duration,
+                        monthName = monthName,
+                        activeDays = activeDays,
+                        monthlyFund = monthlyFund
+                    )
+
+                    trySend(collection).isSuccess // Emit the collection object
+                }
+            } else {
+                // Handle the case where no document exists
+                close(IllegalStateException("No collection settings found"))
+            }
         }
+
+        awaitClose { listener.remove() } // Cleanup listener when flow is canceled
     }
 
-    suspend fun deleteCollectionSettings(collectionId: Int): Boolean {
+    fun deleteCollectionSettings(): Result<Unit> {
         return try {
-            Log.d("CollectionRepository", "Deleting collection with ID: $collectionId")
-            db.collection("fundsetting").document("fund_$collectionId").delete().await()
-            Log.d("CollectionRepository", "Successfully deleted collection with ID: $collectionId")
-            true
+            val collection = db.collection("fundsetting")
+            collection.get().addOnSuccessListener { querySnapshot ->
+                querySnapshot.forEach { document ->
+                    collection.document(document.id).delete()
+                }
+            }.addOnFailureListener { exception ->
+                throw exception
+            }
+            Result.success(Unit)
         } catch (e: Exception) {
-            Log.e("CollectionRepository", "Error deleting collection with ID: $collectionId", e)
-            false
+            Result.failure(e)
         }
     }
 

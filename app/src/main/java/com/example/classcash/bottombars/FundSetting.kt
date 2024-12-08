@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.example.classcash.R
-import com.example.classcash.Routes
 import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.collection.CollectionViewModel
 import java.util.Calendar
@@ -49,6 +48,15 @@ fun FundSetting(
     var duration by remember { mutableStateOf("") }
     var dailyFund by remember { mutableStateOf("") }
     val errorMessage = (collectionViewModel.message.observeAsState(null).value as? CollectionViewModel.MessageType.Error)?.message
+
+    val collection = collectionViewModel.collection.observeAsState().value
+
+    LaunchedEffect(collection) {
+        collection?.let {
+            duration = it.duration ?.toString() ?: ""
+            dailyFund = it.dailyFund?.toString() ?: ""
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -94,7 +102,12 @@ fun FundSetting(
                     collectionViewModel.saveCollection()
                 },
                 onEditToggle = { isEditingDailyFund = it },
-                displayValue = if (dailyFund.isNotEmpty()) "Daily Fund: ₱$dailyFund.00 per student" else "Daily Fund: Not Set"
+                displayValue = if (dailyFund.isNotEmpty()) {
+                    val dailyFundValue = dailyFund.toDoubleOrNull() ?: 0.0 // Ensure the value is a valid number
+                    "Daily Fund: ₱${String.format("%.2f", dailyFundValue)} per student"
+                } else {
+                    "Daily Fund: Not Set"
+                }
             )
 
             Spacer(modifier = Modifier.height(30.dp))
@@ -445,6 +458,12 @@ fun MonthDetails(
     activeDays: List<String>,
     onAddActiveDay: (List<String>) -> Unit
 ) {
+    val monthDetails by collectionViewModel.monthDetails.observeAsState()
+
+    LaunchedEffect(Unit) {
+        collectionViewModel.fetchCollectionSettings()
+    }
+
     // If no month is selected, show a message and return
     if (selectedMonth == null) {
         Text(text = "No month details available.", color = Color.Red, modifier = Modifier.fillMaxWidth())
@@ -491,7 +510,7 @@ fun MonthDetails(
             fontFamily = FontFamily.Monospace
         )
         Text(
-            text = "Estimated Amount: ${String.format("%.2f", monthlyFund)}",
+            text = "Estimated Amount: ₱${String.format("%.2f", monthlyFund)}",
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             fontFamily = FontFamily.Monospace,

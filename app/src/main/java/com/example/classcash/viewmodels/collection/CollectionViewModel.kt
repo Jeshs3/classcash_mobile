@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import android.util.Log
+import kotlinx.coroutines.flow.catch
 
 
 class CollectionViewModel(private val collectionRepository: CollectionRepository) : ViewModel() {
@@ -140,19 +141,16 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
 
     fun fetchCollectionSettings() {
         Log.d("CollectionViewModel", "Fetching collection settings...")
-        val collectionId = _collection.value?.collectionId?.plus(1) ?: 1
         viewModelScope.launch {
-            try {
-                val collection = collectionRepository.getCollectionById(collectionId) // Fetch single collection
-                if (collection != null) {
+            collectionRepository.fetchCollectionSettings()
+                .catch { e ->
+                    // Handle errors in fetching collection settings
+                    handleError("Failed to load collection: ${e.message}")
+                }
+                .collect { collection ->
                     _collection.value = collection // Update LiveData with fetched collection
                     Log.d("CollectionViewModel", "Fetched collection settings: ${_collection.value}")
-                } else {
-                    handleError("No collection found with ID: $collectionId") // Handle case when no collection exists
                 }
-            } catch (e: Exception) {
-                handleError("Failed to load collection: ${e.message}") // Handle exceptions
-            }
         }
     }
 
@@ -194,16 +192,15 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
         }
     }
 
-
     fun deleteCollection(collectionId: Int) {
         viewModelScope.launch {
             try {
                 Log.d("CollectionViewModel", "Initiating deletion for collection ID: $collectionId")
 
-                // Attempt to delete the collection from the repository
-                val success = collectionRepository.deleteCollectionSettings(collectionId)
+                // Attempt to delete the collection using the repository function
+                val result = collectionRepository.deleteCollectionSettings()
 
-                if (success) {
+                result.onSuccess {
                     // If deletion is successful, reset the local state
                     _collection.value = _collection.value?.copy(
                         monthName = "",  // Clear the month name
@@ -214,8 +211,8 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
                     )
 
                     Log.d("CollectionViewModel", "Successfully deleted collection data.")
-                } else {
-                    Log.e("CollectionViewModel", "Failed to delete collection from the repository.")
+                }.onFailure { exception ->
+                    Log.e("CollectionViewModel", "Failed to delete collection from the repository.", exception)
                     handleError("Failed to delete collection. Please try again.")
                 }
             } catch (e: Exception) {
