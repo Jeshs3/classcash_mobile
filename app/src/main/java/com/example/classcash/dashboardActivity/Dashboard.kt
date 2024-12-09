@@ -2,7 +2,6 @@ package com.example.classcash.dashboardActivity
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
@@ -16,14 +15,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavController
@@ -48,6 +45,13 @@ fun DashboardScreen(
 ) {
 
     val classSize by addStudentViewModel.classSize.collectAsState()
+    var isDialogOpen by remember { mutableStateOf(false) }
+
+    // Observe the filtered students from the ViewModel
+    val filteredStudents by dashboardViewModel.filteredStudents.collectAsState()
+
+    // Observe the search query
+    val searchQuery by dashboardViewModel.searchQuery.collectAsState()
 
     // Column layout for the screen content
     Column(
@@ -59,7 +63,12 @@ fun DashboardScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-            BalanceBox(navController, collectionViewModel, paymentViewModel)
+            BalanceBox(
+                navController,
+                collectionViewModel,
+                paymentViewModel,
+                addStudentViewModel
+                )
 
             HorizontalDivider(
                 color = Color(0xFFADEBB3),
@@ -75,7 +84,9 @@ fun DashboardScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ){
-            IconButton(onClick = { navController.navigate(Routes.studentadd) }) {
+            IconButton(onClick = {
+                isDialogOpen = true
+            }) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_search),
                     contentDescription = "Search Student",
@@ -112,6 +123,38 @@ fun DashboardScreen(
         Spacer(modifier = Modifier.height(140.dp))
 
         }
+
+    // Dialog for searching students
+    if (isDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { isDialogOpen = false },
+            title = {
+                Text(text = "Search Students")
+            },
+            text = {
+                Column {
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { query ->
+                            dashboardViewModel.searchStudents(query)
+                        },
+                        placeholder = {
+                            Text("Enter student name")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFFADEBB3)
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { isDialogOpen = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
 }
 
 
@@ -119,11 +162,16 @@ fun DashboardScreen(
 fun BalanceBox(
     navController: NavController,
     collectionViewModel : CollectionViewModel,
-    paymentViewModel : PaymentViewModel
+    paymentViewModel : PaymentViewModel,
+    addStudentViewModel : AddStudentViewModel
 ) {
 
     //Class Balance
     val classBalance by paymentViewModel.classBalance.observeAsState(initial = 0.0)
+
+    LaunchedEffect(Unit){
+        addStudentViewModel.fetchClassBalance()
+    }
 
     // Fetching collection settings from ViewModel
     val collectionSettings by collectionViewModel.collection.observeAsState()
@@ -286,48 +334,35 @@ fun StudentsList(
                     Box(
                         modifier = Modifier
                             .clickable {
-                                navController.navigate(Routes.trview)
+                                navController.navigate(Routes.studentinfo(student.studentId))
                             }
                             .padding(7.dp)
                             .size(60.dp)
-                            .border(width = 2.dp, shape = RoundedCornerShape(50.dp), color = Color.Green)
-                            .background(Color(0xFFADEBB3), shape = CircleShape),
-                        contentAlignment = Alignment.Center
                     ) {
                         // Custom Circular Progress using Canvas
-                        Canvas(modifier = Modifier.size(50.dp)) {
-                            val progressValue = progress / 100f
-                            val strokeWidth = 6f
-                            val radius = size.minDimension / 2
-                            val angle = 360f * progressValue
+                        Canvas(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            val progress = 0.75f // Replace with actual progress (0.0f to 1.0f)
+                            val strokeWidth = 8.dp.toPx()
 
-                            // Draw background circle
-                            drawArc(
-                                color = Color.Gray,
-                                startAngle = 0f,
-                                sweepAngle = 360f,
-                                useCenter = false,
-                                size = Size(radius * 2, radius * 2),
+                            drawCircle(
+                                color = Color.White,
                                 style = Stroke(width = strokeWidth)
                             )
-
-                            // Draw progress circle
                             drawArc(
                                 color = Color.Blue,
                                 startAngle = -90f,
-                                sweepAngle = 360f,
+                                sweepAngle = 360 * progress,
                                 useCenter = false,
-                                size = Size(radius * 2, radius * 2),
                                 style = Stroke(width = strokeWidth)
                             )
                         }
-
-                        // Display progress percentage inside the circle
                         Text(
-                            "$progress%",
-                            color = Color.Blue,
-                            fontFamily = FontFamily(Font(R.font.inter, FontWeight.ExtraBold)),
-                            fontSize = 12.sp
+                            text = "100%", // "${(progress * 100).toInt()}%",
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily(Font(R.font.montserrat)),
+                            modifier = Modifier.align(Alignment.Center)
                         )
                     }
 
@@ -341,7 +376,7 @@ fun StudentsList(
                         modifier = Modifier
                             .weight(1f)
                             .clickable {
-                                navController.navigate(Routes.trview)
+                                navController.navigate(Routes.studentinfo(student.studentId))
                             },
                         contentAlignment = Alignment.Center
                     ) {

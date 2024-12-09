@@ -2,14 +2,16 @@ package com.example.classcash.viewmodels.payment
 
 import android.util.Log
 import com.example.classcash.viewmodels.addstudent.Student
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
-class PaymentRepository {
+class PaymentRepository(private val db: FirebaseFirestore){
 
     private val firestore = FirebaseFirestore.getInstance()
     private val studentsCollection = firestore.collection("students")
     private val notificationsCollection = firestore.collection("notifications")
+    private val transactionsCollection = firestore.collection("transactions")
     private val classBalanceDocument = firestore.collection("classBalance").document("currentBalance")
 
 
@@ -82,6 +84,44 @@ class PaymentRepository {
         }
     }
 
+    // Process the withdrawal of a specified amount from the class balance
+    suspend fun processWithdrawal(purpose: String, amount: Double): Boolean {
+        return try {
+            // Run a transaction to ensure atomicity
+            firestore.runTransaction { transaction ->
+                // Fetch the current class balance
+                val balanceSnapshot = transaction.get(classBalanceDocument)
+                val currentBalance = balanceSnapshot.getDouble("amount") ?: 0.0
+
+                // Check if there is enough balance for the withdrawal
+                if (currentBalance >= amount) {
+                    // Update the class balance
+                    val updatedBalance = currentBalance - amount
+                    transaction.update(classBalanceDocument, "amount", updatedBalance)
+
+                    // Record the withdrawal transaction
+                    val transactionData = mapOf(
+                        "purpose" to purpose,
+                        "amount" to amount,
+                        "timestamp" to FieldValue.serverTimestamp()
+                    )
+                    transactionsCollection.add(transactionData)
+
+                    // Transaction completed successfully
+                    updatedBalance
+                } else {
+                    throw Exception("Insufficient balance for withdrawal")
+                }
+            }.await()
+
+            Log.d("PaymentRepository", "Withdrawal successfully processed")
+            true // Return true if the transaction succeeded
+        } catch (e: Exception) {
+            Log.e("PaymentRepository", "Error processing withdrawal", e)
+            false // Return false if the transaction failed
+        }
+    }
+
     // Add a notification log
     suspend fun addNotification(message: String): Boolean {
         val notification = mapOf(
@@ -125,6 +165,20 @@ class PaymentRepository {
         } catch (e: Exception) {
             Log.e("getClassBalance", "Error fetching class balance", e)
             null
+        }
+    }
+
+
+    // Reset the class balance to 0
+    suspend fun deleteClassBalance(): Boolean {
+        return try {
+            // Update the Firestore document to set the balance to zero
+            classBalanceDocument.set(mapOf("amount" to 0.0)).await()
+            Log.d("resetClassBalance", "Class balance reset successfully")
+            true
+        } catch (e: Exception) {
+            Log.e("resetClassBalance", "Error resetting class balance", e)
+            false
         }
     }
 

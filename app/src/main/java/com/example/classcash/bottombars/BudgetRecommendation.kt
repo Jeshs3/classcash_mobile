@@ -16,14 +16,19 @@ import androidx.compose.ui.unit.*
 import androidx.navigation.NavController
 import com.example.classcash.R
 import com.example.classcash.viewmodels.TopScreenViewModel
+import com.example.classcash.viewmodels.event.BudgetViewModel
+import com.example.classcash.viewmodels.payment.PaymentViewModel
 
 @Composable
 fun Budget(
     navController: NavController,
-    topScreenViewModel: TopScreenViewModel
+    topScreenViewModel: TopScreenViewModel,
+    budgetViewModel : BudgetViewModel,
+    paymentViewModel : PaymentViewModel
 ) {
 
-    // Content
+
+
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -148,7 +153,9 @@ fun Budget(
 
                 // Icon for generating budget again
                 IconButton(
-                    onClick = {},
+                    onClick = {
+                        //budgetViewModel.regenerateBudget(event)
+                    },
                     modifier = Modifier
                         .align(Alignment.End)
                         .padding(top = 8.dp)
@@ -165,7 +172,9 @@ fun Budget(
 
         // Delete Button
         Button(
-            onClick = {},
+            onClick = {
+                //budgetViewModel.deleteBudget(eventId)
+            },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)

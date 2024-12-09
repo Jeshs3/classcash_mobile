@@ -152,6 +152,8 @@ class PaymentViewModel(private val paymentRepository: PaymentRepository) : ViewM
         }
     }
 
+
+
     // Update the stored student data
     fun updateStudentObject(onResult: (Boolean) -> Unit) {
         currentStudent?.let { student ->

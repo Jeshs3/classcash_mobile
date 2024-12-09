@@ -67,19 +67,19 @@ fun EventScreen(
 fun CalendarScreen(
     addEventViewModel: AddEventViewModel
 ) {
-
-    // Get the current start and end date from the ViewModel
     val startDate by addEventViewModel.startDate.observeAsState(
         initial = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     )
     val endDate by addEventViewModel.endDate.observeAsState(
         initial = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     )
-
-    // Get the dates for shading based on the start and end date
     val (currentYear, currentMonth) = remember { addEventViewModel.getCurrentMonth() }
     val daysForMonth = remember { addEventViewModel.getDaysForMonth(currentYear, currentMonth) }
     val monthEnum = Month.values().firstOrNull { it.ordinal == currentMonth - 1 }
+
+    // State for dialog visibility and selected date
+    var showEventDetailsDialog by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -124,7 +124,6 @@ fun CalendarScreen(
         ) {
             items(daysForMonth.size) { index ->
                 val date = daysForMonth[index]
-                // Check if the date is within the updated range
                 val isShaded = date != null && startDate != null && endDate != null &&
                         date in startDate..endDate
 
@@ -134,7 +133,11 @@ fun CalendarScreen(
                         .background(
                             if (isShaded) Color.Blue else Color.Gray
                         )
-                        .border(1.dp, Color.LightGray),
+                        .border(1.dp, Color.LightGray)
+                        .clickable(enabled = isShaded) {
+                            selectedDate = date
+                            showEventDetailsDialog = true
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -146,6 +149,14 @@ fun CalendarScreen(
                 }
             }
         }
+    }
+
+    // Show Event Details Dialog
+    if (showEventDetailsDialog && selectedDate != null) {
+        EventDetailsDialog(
+            selectedDate = selectedDate!!,
+            onDismiss = { showEventDetailsDialog = false }
+        )
     }
 }
 
@@ -200,16 +211,6 @@ fun AddEventSection(
             ExpenseDialog(
                 expenseList = expenseList,
                 onDismiss = { showExpenseDialog = false }
-            )
-        }
-
-        // Display Event Details Section
-        if (showEventDetails && currentEventId != 1) {
-            EventDisplaySection(
-                eventId = currentEventId,
-                budgetViewModel = budgetViewModel,
-                paymentViewModel = paymentViewModel,
-                addEventViewModel = addEventViewModel
             )
         }
     }
@@ -379,7 +380,7 @@ fun DatePickerDialog(
                         onDismissRequest()
                     },
                         colors = ButtonDefaults.buttonColors(Color.Green)
-                        ) {
+                    ) {
                         Text("OK")
                     }
                 }
@@ -426,7 +427,7 @@ fun DateRangePickerDialog(
                 onDismissRequest()
             },
                 colors = ButtonDefaults.buttonColors(Color(0xFFADEBB3))
-                ) {
+            ) {
                 Text(
                     "Confirm",
                     fontFamily = FontFamily(Font(R.font.montserrat))
@@ -598,5 +599,4 @@ fun EventDisplaySection(
         )
     }
 }
-
 

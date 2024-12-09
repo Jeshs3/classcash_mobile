@@ -1,6 +1,8 @@
 package com.example.classcash.dashboardActivity
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,27 +19,38 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.*
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.classcash.R
 import com.example.classcash.viewmodels.addstudent.AddStudentViewModel
 import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.addstudent.StudentRepository
-import com.example.classcash.viewmodels.addstudent.AddStudentViewModelFactory
 
 @Composable
 fun AddStudentScreen(
-    navController: NavController,
-    topScreenViewModel: TopScreenViewModel = viewModel(),
+    navController : NavController,
+    topScreenViewModel: TopScreenViewModel,
+    addStudentViewModel : AddStudentViewModel,
     studentRepository: StudentRepository
 ) {
-    val addStudentViewModel: AddStudentViewModel = viewModel(
-        factory = AddStudentViewModelFactory(studentRepository)
-    )
+
     val context = LocalContext.current
     val uiState by addStudentViewModel.uiState.collectAsState()
     val studentNames by addStudentViewModel.studentNames.collectAsState(initial = emptyList())
     val inputState by addStudentViewModel.inputState.collectAsState("")
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri?.let {
+                // Read file content
+                val inputStream = context.contentResolver.openInputStream(it)
+                val fileContent = inputStream?.bufferedReader()?.use { reader -> reader.readText() }
+                fileContent?.let { csvContent ->
+                    addStudentViewModel.import(csvContent) // Pass CSV content to ViewModel
+                }
+            }
+        }
+    )
 
     Column(
         modifier = Modifier
@@ -68,7 +81,9 @@ fun AddStudentScreen(
                     color = Color(0xFF333333)
                 )
                 IconButton(
-                    onClick = { /* Handle import functionality */ },
+                    onClick = {
+                        filePickerLauncher.launch(arrayOf("text/csv"))
+                    },
                     modifier = Modifier.size(30.dp)
                 ) {
                     Icon(

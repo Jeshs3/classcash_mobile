@@ -21,9 +21,11 @@ import com.example.classcash.R
 import com.example.classcash.viewmodels.addstudent.Student
 import com.example.classcash.viewmodels.dashboard.DashboardViewModel
 import com.example.classcash.viewmodels.payment.PaymentViewModel
+import com.example.classcash.viewmodels.payment.TransactionViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.text.isDigit
 
 @Composable
 fun PaymentBox(
@@ -143,7 +145,6 @@ fun PaymentBox(
                                     if (success) {
                                         isLoading = false
                                         dashboardViewModel.refreshStudentObjects()
-                                        //paymentViewModel.fetchClassBalance()
                                         showSuccessDialog = true
                                     } else {
                                         showError = true
@@ -210,28 +211,28 @@ fun PaymentBox(
 }
 
 
-
-
-
 @Composable
-fun WithdrawBox(navController: NavController){
-
-
+fun WithdrawBox(
+    navController: NavController,
+    transactionViewModel: TransactionViewModel
+) {
     val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
     var amount by remember { mutableStateOf("") }
-    var purpose by remember { mutableStateOf("")}
+    var purpose by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var showError by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
-    Dialog(onDismissRequest = { navController.popBackStack()}) {
+    Dialog(onDismissRequest = { navController.popBackStack() }) {
         Box(
             modifier = Modifier
                 .width(300.dp)
                 .background(Color(0xFFADEBB3), RoundedCornerShape(8.dp))
-                .padding(16.dp)  // Add padding to the dialog content
+                .padding(16.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Header row with title and close icon
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -252,7 +253,6 @@ fun WithdrawBox(navController: NavController){
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Date
                 Text(
                     text = date,
                     fontFamily = FontFamily(Font(R.font.montserrat)),
@@ -268,7 +268,6 @@ fun WithdrawBox(navController: NavController){
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Field for withdrawal purpose
                 Text(
                     text = "What is the purpose?",
                     fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Medium)),
@@ -290,7 +289,6 @@ fun WithdrawBox(navController: NavController){
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                //Field for amount
                 Text(
                     text = "Input Balance:",
                     fontFamily = FontFamily(Font(R.font.montserrat, FontWeight.Medium)),
@@ -299,7 +297,12 @@ fun WithdrawBox(navController: NavController){
 
                 OutlinedTextField(
                     value = amount,
-                    onValueChange = { amount = it },
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() || it == '.' }) {
+                            amount = input
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     placeholder = {
                         Text(
                             text = "Please enter amount",
@@ -312,9 +315,24 @@ fun WithdrawBox(navController: NavController){
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Enter button
                 Button(
-                    onClick = { /* Handle payment action */ },
+                    onClick = {
+                        if (amount.isNotBlank()) {
+                            isLoading = true
+                            val amountValue = amount.toDouble()
+                            transactionViewModel.withdrawBalance(amountValue, purpose){ success ->
+                                if (success) {
+                                    isLoading = false
+                                    showSuccessDialog = true
+                                } else {
+                                    showError = true
+                                }
+                            }
+
+                        } else {
+                            showError = true
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -327,18 +345,76 @@ fun WithdrawBox(navController: NavController){
                         fontFamily = FontFamily(Font(R.font.montserrat))
                     )
                 }
+
+                // Show Loading Indicator
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        color = Color.Red
+                    )
+                }
+
+                // Show Error
+                if (showError) {
+                    Text(
+                        text = "Error: Invalid input or insufficient balance.",
+                        color = Color.Red,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // Show Success
+                if (showSuccessDialog) {
+                    Text(
+                        text = "Withdrawal successful!",
+                        color = Color.Black,
+                        fontFamily = FontFamily(Font(R.font.montserrat)),
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
+    // Success dialog
+    if (showSuccessDialog) {
 
+        AlertDialog(
+            onDismissRequest = {showSuccessDialog = false},
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSuccessDialog = false
+                        navController.popBackStack()
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            text = {
+                Text(
+                    text = "You withdrew $amount on $date",
+                    fontFamily = FontFamily(Font(R.font.montserrat)),
+                    fontSize = 14.sp
+                )
+            },
+            title = { Text("Payment Confirmation") }
+        )
+    }
 }
 
+
 @Composable
-fun ExternalFundBox(navController: NavController){
+fun ExternalFundBox(
+    navController: NavController,
+    transactionViewModel : TransactionViewModel
+){
 
     val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
     var amount by remember { mutableStateOf("") }
     var source by remember { mutableStateOf("")}
+    var isLoading by remember { mutableStateOf(false) }
+    var showError by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = { navController.popBackStack() }) {
         Box(
@@ -414,7 +490,12 @@ fun ExternalFundBox(navController: NavController){
                 )
                 OutlinedTextField(
                     value = amount,
-                    onValueChange = { amount = it },
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() || it == '.' }) {
+                            amount = input
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     placeholder = {
                         Text(
                             text = "Please enter amount",
@@ -429,7 +510,22 @@ fun ExternalFundBox(navController: NavController){
 
                 // Enter button
                 Button(
-                    onClick = { /* Handle payment action */ },
+                    onClick = {
+                        if (amount.isNotBlank()) {
+                            isLoading = true
+                            val amountValue = amount.toDouble()
+                            transactionViewModel.addExternalFund(amountValue, source){ success ->
+                                if (success) {
+                                    isLoading = false
+                                    showSuccessDialog = true
+                                } else {
+                                    showError = true
+                                }
+                            }
+                        } else {
+                            showError = true
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -442,8 +538,33 @@ fun ExternalFundBox(navController: NavController){
                         fontFamily = FontFamily(Font(R.font.montserrat))
                     )
                 }
+                // Show Loading Indicator
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        color = Color.Red
+                    )
+                }
+
+                // Show Error
+                if (showError) {
+                    Text(
+                        text = "Error: Invalid input or insufficient balance.",
+                        color = Color.Red,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // Show Success
+                if (showSuccessDialog) {
+                    Text(
+                        text = "Withdrawal successful!",
+                        color = Color.Black,
+                        fontFamily = FontFamily(Font(R.font.montserrat)),
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
-
 }

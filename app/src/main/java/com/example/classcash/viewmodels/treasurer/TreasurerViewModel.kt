@@ -86,9 +86,18 @@ class AuthViewModel : ViewModel() {
             }
     }
 
-    // Login logic
     fun login(onSuccess: () -> Unit, onFailure: (String) -> Unit) {
-        auth.signInWithEmailAndPassword(email.value, password.value)
+        val emailInput = email.value.trim()
+        val passwordInput = password.value.trim()
+
+        if (emailInput.isNullOrBlank() || passwordInput.isNullOrBlank()) {
+            val error = "Email and password cannot be empty."
+            _errorMessage.value = error
+            onFailure(error)
+            return
+        }
+
+        auth.signInWithEmailAndPassword(emailInput, passwordInput)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val userId = auth.currentUser?.uid
@@ -108,6 +117,7 @@ class AuthViewModel : ViewModel() {
                 }
             }
     }
+
 
     // Logout logic
     fun logout() {

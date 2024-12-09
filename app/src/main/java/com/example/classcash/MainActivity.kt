@@ -32,6 +32,7 @@ import com.example.classcash.dashboardActivity.ExternalFundBox
 import com.example.classcash.dashboardActivity.LoginScreen
 import com.example.classcash.dashboardActivity.ProfileScreen
 import com.example.classcash.dashboardActivity.SidePanel
+import com.example.classcash.dashboardActivity.StudentInfoScreen
 import com.example.classcash.dashboardActivity.sidepanel.About
 import com.example.classcash.dashboardActivity.sidepanel.StudentFiles
 import com.example.classcash.recyclable.BottomNavigationBar
@@ -49,6 +50,7 @@ import com.example.classcash.viewmodels.dashboard.DashboardViewModel
 import com.example.classcash.viewmodels.dashboard.DashboardViewModelFactory
 import com.example.classcash.viewmodels.event.AddEventViewModel
 import com.example.classcash.viewmodels.event.AddEventViewModelFactory
+import com.example.classcash.viewmodels.event.BudgetViewModel
 import com.example.classcash.viewmodels.event.EventRepository
 import com.example.classcash.viewmodels.notifications.NotificationsRepository
 import com.example.classcash.viewmodels.notifications.NotificationsViewModel
@@ -56,6 +58,7 @@ import com.example.classcash.viewmodels.notifications.NotificationsViewModelFact
 import com.example.classcash.viewmodels.payment.PaymentRepository
 import com.example.classcash.viewmodels.payment.PaymentViewModel
 import com.example.classcash.viewmodels.payment.PaymentViewModelFactory
+import com.example.classcash.viewmodels.payment.TransactionViewModel
 import com.example.classcash.viewmodels.treasurer.AuthViewModel
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -91,15 +94,24 @@ fun ClassCash() {
     val firebaseFirestore = FirebaseFirestore.getInstance()
     val studentRepository = StudentRepository(firebaseFirestore)
     val collectionRepository = CollectionRepository(firebaseFirestore)
+    val eventRepository = EventRepository(firebaseFirestore)
+    val paymentRepository = PaymentRepository(firebaseFirestore)
 
     val addStudentViewModel: AddStudentViewModel = viewModel(
-        factory = AddStudentViewModelFactory(studentRepository)
+        factory = AddStudentViewModelFactory(studentRepository, paymentRepository)
     )
 
-    // Event Management
-    val eventRepository = EventRepository()
-    val eventViewModelFactory = AddEventViewModelFactory(eventRepository)
-    val eventViewModel: AddEventViewModel = viewModel(factory = eventViewModelFactory)
+    val transactionViewModel : TransactionViewModel = viewModel(
+        factory = PaymentViewModelFactory(paymentRepository)
+
+    )
+    val addEventViewModel : AddEventViewModel = viewModel(
+        factory = AddEventViewModelFactory(eventRepository)
+    )
+
+    val budgetViewModel : BudgetViewModel = viewModel(
+        factory = AddEventViewModelFactory(eventRepository)
+    )
 
     // Fund Setup
     val collectionViewModel : CollectionViewModel = viewModel(
@@ -107,7 +119,6 @@ fun ClassCash() {
     )
 
     //Payment
-    val paymentRepository = PaymentRepository()
     val paymentViewModelFactory = PaymentViewModelFactory(paymentRepository)
     val paymentViewModel : PaymentViewModel = viewModel(factory = paymentViewModelFactory)
 
@@ -128,7 +139,8 @@ fun ClassCash() {
         Routes.recommend,
         Routes.studentadd,
         Routes.trview,
-        Routes.notification
+        Routes.notification,
+        Routes.studentinfo
     )
 
     // Drawer state
@@ -207,7 +219,9 @@ fun ClassCash() {
                         EventScreen(
                             navController,
                             topScreenViewModel,
-                            eventViewModel
+                            addEventViewModel,
+                            budgetViewModel,
+                            paymentViewModel
                         )
                     }
                     composable(Routes.analytics) {
@@ -226,13 +240,16 @@ fun ClassCash() {
                     composable(Routes.recommend) {
                         Budget(
                             navController,
-                            topScreenViewModel
+                            topScreenViewModel,
+                            budgetViewModel,
+                            paymentViewModel
                         )
                     }
                     composable(Routes.studentadd) {
                         AddStudentScreen(
                             navController,
                             topScreenViewModel,
+                            addStudentViewModel,
                             studentRepository
                         )
                     }
@@ -260,10 +277,16 @@ fun ClassCash() {
 
                     }
                     composable(Routes.withdrawbox) {
-                        WithdrawBox(navController)
+                        WithdrawBox(
+                            navController,
+                            transactionViewModel
+                        )
                     }
                     composable(Routes.extfund) {
-                        ExternalFundBox(navController)
+                        ExternalFundBox(
+                            navController,
+                            transactionViewModel
+                        )
                     }
                     composable(Routes.profile) {
                         ProfileScreen(
@@ -277,6 +300,10 @@ fun ClassCash() {
                     }
                     composable(Routes.aboutsection) {
                         About(navController)
+                    }
+                    composable(Routes.studentinfo) { backStackEntry ->
+                        val studentId = backStackEntry.arguments?.getString("studentId")?.toIntOrNull() ?: 0
+                        StudentInfoScreen(navController, dashboardViewModel, studentId)
                     }
                 }
             }

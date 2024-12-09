@@ -69,6 +69,7 @@ dependencies {
     implementation ("com.google.firebase:firebase-storage:19.1.0")
     implementation("io.coil-kt:coil-compose:2.2.2")
     implementation ("androidx.lifecycle:lifecycle-livedata-ktx:2.6.1")
+    implementation("com.opencsv:opencsv:5.7.1")
     implementation(libs.androidx.storage)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

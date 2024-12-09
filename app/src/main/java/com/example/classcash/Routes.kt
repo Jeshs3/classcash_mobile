@@ -16,7 +16,9 @@ object Routes {
     var extfund = "extfund"
     var profile = "profile"
     var files = "files"
+    var studentinfo = "studentinfo/{studentId}"
     var aboutsection = "aboutsection"
 
+    fun studentinfo(studentId: Int) = "studentinfo/$studentId"
     fun pbox(studentId: Int) = "pbox/$studentId"
 }
