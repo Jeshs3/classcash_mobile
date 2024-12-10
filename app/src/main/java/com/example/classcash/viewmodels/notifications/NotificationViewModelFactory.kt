@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.classcash.viewmodels.addstudent.Student
 
-class NotificationsViewModelFactory(
+/*class NotificationsViewModelFactory(
     private val students: List<Student>,
     private val withdrawalLogs: List<Student.TransactionLog>,
     private val sinkingFundTarget: Double,
@@ -24,4 +24,4 @@ class NotificationsViewModelFactory(
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
-}
+}*/

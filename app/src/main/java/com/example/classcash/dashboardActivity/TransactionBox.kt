@@ -146,6 +146,7 @@ fun PaymentBox(
                                         isLoading = false
                                         dashboardViewModel.refreshStudentObjects()
                                         showSuccessDialog = true
+                                        navController.popBackStack()
                                     } else {
                                         showError = true
                                     }
@@ -321,9 +322,10 @@ fun WithdrawBox(
                             isLoading = true
                             val amountValue = amount.toDouble()
                             transactionViewModel.withdrawBalance(amountValue, purpose){ success ->
+                                isLoading = false
                                 if (success) {
-                                    isLoading = false
                                     showSuccessDialog = true
+                                    navController.popBackStack()
                                 } else {
                                     showError = true
                                 }
@@ -512,12 +514,12 @@ fun ExternalFundBox(
                 Button(
                     onClick = {
                         if (amount.isNotBlank()) {
-                            isLoading = true
                             val amountValue = amount.toDouble()
                             transactionViewModel.addExternalFund(amountValue, source){ success ->
+                                isLoading = false
                                 if (success) {
-                                    isLoading = false
                                     showSuccessDialog = true
+                                    navController.popBackStack()
                                 } else {
                                     showError = true
                                 }

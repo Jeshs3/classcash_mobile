@@ -2,7 +2,6 @@
 
 package com.example.classcash.bottombars
 
-
 import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -11,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
@@ -21,11 +19,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.example.classcash.R
+import com.example.classcash.Routes
 import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.event.AddEventViewModel
 import com.example.classcash.viewmodels.event.BudgetViewModel
@@ -44,6 +43,7 @@ fun EventScreen(
     paymentViewModel : PaymentViewModel
 ) {
 
+    val context = LocalContext.current
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -53,19 +53,27 @@ fun EventScreen(
     ) {
         // Calendar Section
         item {
-            CalendarScreen(addEventViewModel)
+            CalendarScreen(navController, addEventViewModel,paymentViewModel, budgetViewModel)
         }
 
         // Add Event Section
         item {
-            AddEventSection(addEventViewModel, budgetViewModel, paymentViewModel)
+            AddEventSection(
+                addEventViewModel,
+                onEventSaved = {
+                    Toast.makeText(context, "Event saved successfully! See the details on the shaded dates", Toast.LENGTH_SHORT).show()
+                }
+            )
         }
     }
 }
 
 @Composable
 fun CalendarScreen(
-    addEventViewModel: AddEventViewModel
+    navController : NavController,
+    addEventViewModel: AddEventViewModel,
+    paymentViewModel: PaymentViewModel,
+    budgetViewModel : BudgetViewModel
 ) {
     val startDate by addEventViewModel.startDate.observeAsState(
         initial = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
@@ -78,8 +86,9 @@ fun CalendarScreen(
     val monthEnum = Month.values().firstOrNull { it.ordinal == currentMonth - 1 }
 
     // State for dialog visibility and selected date
-    var showEventDetailsDialog by remember { mutableStateOf(false) }
+    var showEventDialog by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedEventId by remember { mutableStateOf(-1) }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -136,7 +145,7 @@ fun CalendarScreen(
                         .border(1.dp, Color.LightGray)
                         .clickable(enabled = isShaded) {
                             selectedDate = date
-                            showEventDetailsDialog = true
+                            showEventDialog = true
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -152,10 +161,14 @@ fun CalendarScreen(
     }
 
     // Show Event Details Dialog
-    if (showEventDetailsDialog && selectedDate != null) {
+    if (showEventDialog) {
         EventDetailsDialog(
-            selectedDate = selectedDate!!,
-            onDismiss = { showEventDetailsDialog = false }
+            eventId = selectedEventId,
+            budgetViewModel,
+            paymentViewModel,
+            addEventViewModel,
+            navController,
+            onDismiss = { showEventDialog = false }
         )
     }
 }
@@ -165,152 +178,135 @@ fun CalendarScreen(
 @Composable
 fun AddEventSection(
     addEventViewModel: AddEventViewModel,
-    budgetViewModel: BudgetViewModel,
-    paymentViewModel: PaymentViewModel
-) {
-    val events by addEventViewModel.event.observeAsState()
-    var showInputField by remember { mutableStateOf(true) }
-    var showExpenseDialog by remember { mutableStateOf(false) }
-    var showEventDetails by remember { mutableStateOf(false) }
-    val expenseList = remember { mutableStateListOf<Double>() }
-
-    val currentEventId = events?.eventId ?: 1
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(10.dp)
-    ) {
-        // Add event input or show event details
-        if (showInputField) {
-            EventInputSection(
-                addEventViewModel = addEventViewModel,
-                onEventSaved = {
-                    showInputField = false
-                    showEventDetails = true
-                },
-                showExpenseDialog = showExpenseDialog,
-                setShowExpenseDialog = { showExpenseDialog = it }
-            )
-        } else {
-            // Show Add Event Button
-            IconButton(onClick = {
-                showInputField = true
-                showEventDetails = false
-            }) {
-                Icon(
-                    painter = painterResource(id = R.drawable.circle_add),
-                    contentDescription = "Add Event",
-                    tint = Color.Blue
-                )
-            }
-        }
-
-        // Expense Dialog
-        if (showExpenseDialog) {
-            ExpenseDialog(
-                expenseList = expenseList,
-                onDismiss = { showExpenseDialog = false }
-            )
-        }
-    }
-}
-
-@Composable
-fun EventInputSection(
-    addEventViewModel: AddEventViewModel,
-    onEventSaved: () -> Unit,
-    showExpenseDialog: Boolean,
-    setShowExpenseDialog: (Boolean) -> Unit
+    onEventSaved: () -> Unit
 ) {
     var eventName by remember { mutableStateOf("") }
     var eventDescription by remember { mutableStateOf("") }
     var startDate by remember { mutableStateOf<LocalDate?>(null) }
     var endDate by remember { mutableStateOf<LocalDate?>(null) }
     var showDateRangePicker by remember { mutableStateOf(false) }
+    var showDescriptionDialog by remember { mutableStateOf(false) }
 
     val saveStatus by addEventViewModel.eventSaveStatus.observeAsState(EventSaveStatus.Success)
     val context = LocalContext.current
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFADEBB3))
-            .padding(16.dp)
-            .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
             .padding(16.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            TextField(
-                value = eventName,
-                onValueChange = {
-                    eventName = it
-                    addEventViewModel.updateEventDetails(mapOf("eventName" to it))
-                },
-                label = { Text("Event Name", color = Color.Gray.copy(alpha = 0.5f)) },
+        // Event Name Input with Trailing Icons
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                .padding(16.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                ),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            TextField(
-                value = eventDescription,
-                onValueChange = {
-                    eventDescription = it
-                    addEventViewModel.updateEventDetails(mapOf("eventDescription" to it))
-                },
-                label = { Text("Description (Optional)", color = Color.Gray.copy(alpha = 0.5f)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                )
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (startDate != null && endDate != null) {
-                Text(
-                    text = "Start Date: ${startDate.toString()} - End Date: ${endDate.toString()}",
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            Button(
-                onClick = {
-                    addEventViewModel.addEvent()
-                },
-                colors = ButtonDefaults.buttonColors(Color.Blue),
-                modifier = Modifier.fillMaxWidth()
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Save Event")
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Event Name",
+                        color = Color.Gray.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    TextField(
+                        value = eventName,
+                        onValueChange = {
+                            eventName = it
+                            addEventViewModel.updateEventDetails(mapOf("eventName" to it))
+                        },
+                        placeholder = {
+                            Text(
+                                "Enter Event Name",
+                                fontFamily = FontFamily(Font(R.font.inter))
+                                )
+                                      },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
+                    )
+                }
+                IconButton(onClick = { showDescriptionDialog = true }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.edit_text),
+                        contentDescription = "Edit Description",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(onClick = { showDateRangePicker = true }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.date_range),
+                        contentDescription = "Select Date Range",
+                        tint = Color.Gray
+                    )
+                }
             }
+        }
 
-            when (saveStatus) {
-                is EventSaveStatus.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-                is EventSaveStatus.Success -> {
-                    LaunchedEffect(Unit) {
-                        Toast.makeText(context, "Event saved successfully!", Toast.LENGTH_SHORT).show()
-                        onEventSaved()
-                    }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Save Event Button
+        Button(
+            onClick = {
+                addEventViewModel.addEvent()
+            },
+            colors = ButtonDefaults.buttonColors(Color.Blue),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Save Event")
+        }
+
+        // Save Status Handling
+        when (saveStatus) {
+            is EventSaveStatus.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+            is EventSaveStatus.Success -> {
+                LaunchedEffect(Unit) {
+                    Toast.makeText(context, "Event saved successfully!", Toast.LENGTH_SHORT).show()
+                    onEventSaved()
                 }
-                is EventSaveStatus.Error -> {
-                    LaunchedEffect(Unit) {
-                        Toast.makeText(context, (saveStatus as EventSaveStatus.Error).message, Toast.LENGTH_LONG).show()
-                    }
-                }
-                else -> {}
             }
+            is EventSaveStatus.Error -> {
+                LaunchedEffect(Unit) {
+                    Toast.makeText(context, (saveStatus as EventSaveStatus.Error).message, Toast.LENGTH_LONG).show()
+                }
+            }
+            else -> {}
         }
     }
 
+    // Description Dialog
+    if (showDescriptionDialog) {
+        AlertDialog(
+            onDismissRequest = { showDescriptionDialog = false },
+            title = { Text("Edit Description") },
+            text = {
+                TextField(
+                    value = eventDescription,
+                    onValueChange = {
+                        eventDescription = it
+                        addEventViewModel.updateEventDetails(mapOf("eventDescription" to it))
+                    },
+                    placeholder = { Text("Enter Description") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showDescriptionDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
+    }
+
+    // Date Range Picker Dialog
     if (showDateRangePicker) {
         DateRangePickerDialog(
             onDatesSelected = { selectedStartDate, selectedEndDate ->
@@ -328,6 +324,7 @@ fun EventInputSection(
         )
     }
 }
+
 
 @Composable
 fun DatePickerDialog(
@@ -527,76 +524,51 @@ fun ExpenseDialog(
 }
 
 @Composable
-fun EventDisplaySection(
+fun EventDetailsDialog(
     eventId: Int,
     budgetViewModel: BudgetViewModel,
     paymentViewModel: PaymentViewModel,
-    addEventViewModel: AddEventViewModel
+    addEventViewModel: AddEventViewModel,
+    navController : NavController,
+    onDismiss: () -> Unit
 ) {
     val classBalance by paymentViewModel.classBalance.observeAsState(0.0)
     val event = addEventViewModel.event.observeAsState().value
 
-
+    // Fetch event details when dialog is displayed
     LaunchedEffect(eventId) {
         addEventViewModel.fetchEventDetails(eventId)
     }
 
-    var showDialog by remember { mutableStateOf(false) } // State for dialog visibility
-
-    // Main Display Box
-    event?.let { event ->
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp)
-                .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
-                .padding(16.dp)
-                .clickable { showDialog = true } // Show dialog on click
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(text = event.eventName ?: "Untitled Event")
-                    Text(text = "From: ${event.startDate ?: "N/A"} To: ${event.endDate ?: "N/A"}")
-                    Text(text = event.eventDescription ?: "No Description")
-                }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "Event Details")
+        },
+        text = {
+            Column {
+                Text(text = "Name: ${event?.eventName ?: "Untitled Event"}")
+                Text(text = "From: ${event?.startDate ?: "N/A"} To: ${event?.endDate ?: "N/A"}")
+                Text(text = "Description: ${event?.eventDescription ?: "No Description"}")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                event?.let { budgetViewModel.computeBudget(it, classBalance) }
+                navController.navigate(Routes.recommend)
+            }) {
+                Text("Generate Budget")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                event?.let { addEventViewModel.removeEvent(it.eventId) }
+                onDismiss()
+            }) {
+                Text("Delete Event")
             }
         }
-    }
-
-    // Alert Dialog
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = {
-                Text(text = "Event Details")
-            },
-            text = {
-                Column {
-                    Text(text = "Name: ${event?.eventName ?: "Untitled Event"}")
-                    Text(text = "From: ${event?.startDate ?: "N/A"} To: ${event?.endDate ?: "N/A"}")
-                    Text(text = "Description: ${event?.eventDescription ?: "No Description"}")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    event?.let { budgetViewModel.computeBudget(it, classBalance) }
-                    showDialog = false
-                }) {
-                    Text("Generate Budget")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    event?.let { addEventViewModel.removeEvent(it.eventId) }
-                    showDialog = false
-                }) {
-                    Text("Delete Event")
-                }
-            }
-        )
-    }
+    )
 }
+
 

@@ -52,12 +52,10 @@ import com.example.classcash.viewmodels.event.AddEventViewModel
 import com.example.classcash.viewmodels.event.AddEventViewModelFactory
 import com.example.classcash.viewmodels.event.BudgetViewModel
 import com.example.classcash.viewmodels.event.EventRepository
-import com.example.classcash.viewmodels.notifications.NotificationsRepository
-import com.example.classcash.viewmodels.notifications.NotificationsViewModel
-import com.example.classcash.viewmodels.notifications.NotificationsViewModelFactory
 import com.example.classcash.viewmodels.payment.PaymentRepository
 import com.example.classcash.viewmodels.payment.PaymentViewModel
 import com.example.classcash.viewmodels.payment.PaymentViewModelFactory
+import com.example.classcash.viewmodels.payment.SharedRepository
 import com.example.classcash.viewmodels.payment.TransactionViewModel
 import com.example.classcash.viewmodels.treasurer.AuthViewModel
 import com.google.firebase.FirebaseApp
@@ -92,17 +90,22 @@ fun ClassCash() {
     val authViewModel: AuthViewModel = viewModel()
 
     val firebaseFirestore = FirebaseFirestore.getInstance()
-    val studentRepository = StudentRepository(firebaseFirestore)
     val collectionRepository = CollectionRepository(firebaseFirestore)
     val eventRepository = EventRepository(firebaseFirestore)
     val paymentRepository = PaymentRepository(firebaseFirestore)
+    val studentRepository = StudentRepository(firebaseFirestore, collectionRepository)
+    val sharedRepository = SharedRepository()
+
+    val dashboardViewModel: DashboardViewModel = viewModel(
+        factory = DashboardViewModelFactory(studentRepository, paymentRepository, collectionRepository)
+    )
 
     val addStudentViewModel: AddStudentViewModel = viewModel(
-        factory = AddStudentViewModelFactory(studentRepository, paymentRepository)
+        factory = AddStudentViewModelFactory(studentRepository, paymentRepository, collectionRepository, dashboardViewModel)
     )
 
     val transactionViewModel : TransactionViewModel = viewModel(
-        factory = PaymentViewModelFactory(paymentRepository)
+        factory = PaymentViewModelFactory(paymentRepository, sharedRepository)
 
     )
     val addEventViewModel : AddEventViewModel = viewModel(
@@ -115,11 +118,11 @@ fun ClassCash() {
 
     // Fund Setup
     val collectionViewModel : CollectionViewModel = viewModel(
-        factory = CollectionViewModelFactory(collectionRepository)
+        factory = CollectionViewModelFactory(collectionRepository, studentRepository)
     )
 
     //Payment
-    val paymentViewModelFactory = PaymentViewModelFactory(paymentRepository)
+    val paymentViewModelFactory = PaymentViewModelFactory(paymentRepository, sharedRepository)
     val paymentViewModel : PaymentViewModel = viewModel(factory = paymentViewModelFactory)
 
 
@@ -127,9 +130,6 @@ fun ClassCash() {
     //val notificationsViewModelFactory = NotificationsViewModelFactory(notificationsRepository)
     //val notificationsViewModel : NotificationsViewModel = viewModel(factory = notificationsViewModelFactory)
 
-    val dashboardViewModel: DashboardViewModel = viewModel(
-        factory = DashboardViewModelFactory(studentRepository, paymentRepository)
-    )
     // Routes where TopBar and SidePanel are visible
     val topBarRoutes = listOf(
         Routes.dashboard,
@@ -234,7 +234,8 @@ fun ClassCash() {
                         FundSetting(
                             navController,
                             topScreenViewModel,
-                            collectionViewModel
+                            collectionViewModel,
+                            dashboardViewModel
                         )
                     }
                     composable(Routes.recommend) {
@@ -250,6 +251,7 @@ fun ClassCash() {
                             navController,
                             topScreenViewModel,
                             addStudentViewModel,
+                            collectionViewModel,
                             studentRepository
                         )
                     }

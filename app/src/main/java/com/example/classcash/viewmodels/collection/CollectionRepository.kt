@@ -45,39 +45,46 @@ class CollectionRepository(private val db: FirebaseFirestore) {
     }
 
     fun fetchCollectionSettings(): Flow<Collection> = callbackFlow {
-        val listener = db.collection("fundsetting").addSnapshotListener { snapshot, exception ->
-            if (exception != null) {
-                close(exception) // Close the flow if an error occurs
-                return@addSnapshotListener
-            }
-
-            if (snapshot != null && !snapshot.isEmpty) {
-                // Assuming the settings correspond to a single document in "fundsetting"
-                val document = snapshot.documents.firstOrNull() // Fetch the first document
-                if (document != null) {
-                    val collectionId = document.getLong("collectionId")?.toInt() ?: 0
-                    val dailyFund = document.getDouble("dailyFund") ?: 0.0
-                    val duration = document.getLong("duration")?.toInt() ?: 0
-                    val monthName = document.getString("monthName") ?: ""
-                    val activeDays = document.get("activeDays") as? List<String> ?: emptyList()
-                    val monthlyFund = document.getDouble("monthlyFund") ?: 0.0
-
-                    val collection = Collection(
-                        collectionId = collectionId,
-                        dailyFund = dailyFund,
-                        duration = duration,
-                        monthName = monthName,
-                        activeDays = activeDays,
-                        monthlyFund = monthlyFund
-                    )
-
-                    trySend(collection).isSuccess // Emit the collection object
+        val listener = db.collection("fundsetting")
+            .orderBy(
+                "updatedAt",
+                Query.Direction.DESCENDING
+            ) // Sort by updatedAt in descending order
+            .limit(1) // Limit to the most recent document
+            .addSnapshotListener { snapshot, exception ->
+                if (exception != null) {
+                    close(exception) // Close the flow if an error occurs
+                    return@addSnapshotListener
                 }
-            } else {
-                // Handle the case where no document exists
-                close(IllegalStateException("No collection settings found"))
+
+                if (snapshot != null && !snapshot.isEmpty) {
+                    // Assuming the settings correspond to a single document in "fundsetting"
+                    val document = snapshot.documents.firstOrNull() // Fetch the first document
+                    if (document != null) {
+                        val collectionId = document.getLong("collectionId")?.toInt() ?: 0
+                        val dailyFund = document.getDouble("dailyFund") ?: 0.0
+                        val duration = document.getLong("duration")?.toInt() ?: 0
+                        val monthName = document.getString("monthName") ?: ""
+                        val activeDays = document.get("activeDays") as? List<String> ?: emptyList()
+                        val monthlyFund = document.getDouble("monthlyFund") ?: 0.0
+
+                        val collection = Collection(
+                            collectionId = collectionId,
+                            dailyFund = dailyFund,
+                            duration = duration,
+                            monthName = monthName,
+                            activeDays = activeDays,
+                            monthlyFund = monthlyFund
+                        )
+                        trySend(collection).isSuccess
+                    } else {
+                        trySend(Collection()).isSuccess
+                    }
+                } else {
+                    // Handle the case where no document exists
+                    close(IllegalStateException("No collection settings found"))
+                }
             }
-        }
 
         awaitClose { listener.remove() } // Cleanup listener when flow is canceled
     }
@@ -101,7 +108,8 @@ class CollectionRepository(private val db: FirebaseFirestore) {
     suspend fun getActiveDays(monthName: String): List<String> {
         return try {
             Log.d("CollectionRepository", "Fetching active days for monthName: $monthName")
-            val querySnapshot = db.collection("fundsetting").whereEqualTo("monthName", monthName).get().await()
+            val querySnapshot =
+                db.collection("fundsetting").whereEqualTo("monthName", monthName).get().await()
 
             if (querySnapshot.isEmpty) {
                 Log.d("CollectionRepository", "No active days found for monthName: $monthName")
@@ -113,6 +121,44 @@ class CollectionRepository(private val db: FirebaseFirestore) {
         } catch (e: Exception) {
             Log.e("CollectionRepository", "Error fetching active days for monthName: $monthName", e)
             emptyList()
+        }
+    }
+
+    suspend fun getMonthlyFund(selectedMonth: String): Double {
+        return try {
+            val querySnapshot = db.collection("fundsetting")
+                .whereEqualTo("monthName", selectedMonth)
+                .limit(1)
+                .get()
+                .await()
+
+            if (querySnapshot.isEmpty) {
+                0.0
+            } else {
+                val document = querySnapshot.documents.first()
+                val dailyFund = document.getDouble("dailyFund") ?: 0.0
+                val activeDays = (document.get("activeDays") as? List<*>)?.size ?: 0
+
+                Log.d("getMonthlyFund", "Daily Fund: $dailyFund, Active Days: $activeDays")
+                dailyFund * activeDays
+            }
+        } catch (e: Exception) {
+            Log.e("CollectionRepository", "Error fetching monthly fund", e)
+            0.0 // Default value in case of failure
+        }
+    }
+
+    suspend fun getSelectedMonth(): String {
+        return try {
+            val snapshot = db.collection("fundsetting")
+                .document("monthName")
+                .get()
+                .await()
+
+            snapshot.getString("monthName") ?: "Current Month"
+        } catch (e: Exception) {
+            Log.e("CollectionRepository", "Error fetching selected month", e)
+            "Current Month" // Default value in case of failure
         }
     }
 }

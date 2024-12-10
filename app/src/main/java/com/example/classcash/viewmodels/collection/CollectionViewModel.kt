@@ -7,10 +7,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import android.util.Log
-import kotlinx.coroutines.flow.catch
+import com.example.classcash.viewmodels.addstudent.Student
+import com.example.classcash.viewmodels.addstudent.StudentRepository
+import com.example.classcash.viewmodels.payment.SharedRepository
+import kotlinx.coroutines.tasks.await
 
 
-class CollectionViewModel(private val collectionRepository: CollectionRepository) : ViewModel() {
+class CollectionViewModel(
+    private val collectionRepository: CollectionRepository,
+    private val studentRepository : StudentRepository
+) : ViewModel() {
+
+    private val sharedRepository = SharedRepository()
 
     private val _collection = MutableLiveData<Collection>()
     val collection: LiveData<Collection> get() = _collection
@@ -19,11 +27,21 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
     private val _monthDetails = MutableLiveData<Map<String, List<String>>>()
     val monthDetails: LiveData<Map<String, List<String>>> get() = _monthDetails
 
-    private val _selectedMonthName = MutableLiveData<String?>()
-    val selectedMonthName: LiveData<String?> get() = _selectedMonthName
+    private val _monthlyFund = MutableLiveData<Double?>(0.0)
+    val monthlyFund: LiveData<Double?> get() = _monthlyFund
+
+    private val _selectedMonth = MutableLiveData<String>("")
+    val selectedMonth: LiveData<String> = _selectedMonth
+
+    private val _students = MutableLiveData<List<Student>>()
+    val students: LiveData<List<Student>> get() = _students
+
+    val targetAmt = sharedRepository.targetAmt
+
 
     private val _message = MutableLiveData<MessageType>()
     val message: LiveData<MessageType> get() = _message
+
 
     sealed class MessageType {
         data class Error(val message: String) : MessageType()
@@ -31,9 +49,8 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
     }
 
 
-    init {
-        Log.d("CollectionViewModel", "Initializing ViewModel...")
-        fetchCollectionSettings()
+    fun updateMonthlyFund(monthlyFund: Double) {
+        _monthlyFund.value = monthlyFund
     }
 
 
@@ -42,7 +59,6 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
         val durationValue = input.toIntOrNull()
         if (durationValue != null && durationValue > 0) {
             _collection.value = _collection.value?.copy(duration = durationValue)
-            saveData()
         } else {
             handleError("Invalid duration")
         }
@@ -53,7 +69,6 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
         val dailyFundValue = input.toDoubleOrNull()
         if (dailyFundValue != null && dailyFundValue > 0) {
             _collection.value = _collection.value?.copy(dailyFund = dailyFundValue)
-            saveData()
         } else {
             handleError("Invalid daily fund")
         }
@@ -75,7 +90,6 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
 
         // Call editActiveDays if needed
         editActiveDays(month, selectedDays)
-        saveData()
     }
 
     fun editActiveDays(monthName: String, selectedDays: List<String>) {
@@ -127,51 +141,31 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
         return currentMonthDetails[month]
     }
 
-    fun updateMonthlyFund(selectedMonth: String) {
-        val dailyFund = collection.value?.dailyFund ?: 0.0
-        val activeDays = monthDetails.value?.get(selectedMonth)?.size ?: 0
-        val updatedFund = dailyFund * activeDays
-        _collection.value = collection.value?.copy(monthlyFund = updatedFund)
-    }
-
     private fun handleError(message: String) {
         Log.e("CollectionViewModel", "Error: $message")
         _message.value = MessageType.Error(message)
     }
 
-    fun fetchCollectionSettings() {
-        Log.d("CollectionViewModel", "Fetching collection settings...")
-        viewModelScope.launch {
-            collectionRepository.fetchCollectionSettings()
-                .catch { e ->
-                    // Handle errors in fetching collection settings
-                    handleError("Failed to load collection: ${e.message}")
-                }
-                .collect { collection ->
-                    _collection.value = collection // Update LiveData with fetched collection
-                    Log.d("CollectionViewModel", "Fetched collection settings: ${_collection.value}")
-                }
-        }
-    }
+    private suspend fun updateStudentsTarget(monthlyFund: Double) {
+        Log.d("CollectionViewModel", "Updating students' targetAmt to $monthlyFund...")
 
-    private fun saveData() {
-        Log.d("CollectionViewModel", "Saving collection data...")
-        val collectionData = _collection.value
-        if (collectionData != null) {
-            viewModelScope.launch {
-                try {
-                    val isSuccess = collectionRepository.saveCollection(collectionData)
-                    if (isSuccess) {
-                        Log.d("CollectionViewModel", "Collection data saved successfully to Firestore.")
-                    } else {
-                        handleError("Failed to save collection data.")
-                    }
-                } catch (e: Exception) {
-                    handleError("Failed to save collection data: ${e.message}")
-                }
+        try {
+            val students = studentRepository.getAllStudents() // Ensure this method exists
+
+            val updatedStudents = students.map { student ->
+                student.copy(targetAmt = monthlyFund)
             }
-        } else {
-            handleError("Collection data is null, cannot save.")
+
+            // Step 3: Update students in a batch operation
+            val result = studentRepository.updateStudentsBatch(updatedStudents)
+            if (result.isSuccess) {
+                Log.d("CollectionViewModel", "Updated targetAmt for all students successfully")
+            } else {
+                handleError("Failed to update students' targetAmt")
+            }
+        } catch (e: Exception) {
+            Log.e("CollectionViewModel", "Error updating students' targetAmt", e)
+            handleError("Error updating students' targetAmt")
         }
     }
 
@@ -183,6 +177,7 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
                 val isSuccess = collectionRepository.saveCollection(settings)
                 if (isSuccess) {
                     Log.d("CollectionViewModel", "Collection saved successfully")
+                    updateStudentsTarget(settings.monthlyFund)
                 } else {
                     handleError("Failed to save collection")
                 }
@@ -221,8 +216,6 @@ class CollectionViewModel(private val collectionRepository: CollectionRepository
             }
         }
     }
-
-
 
     fun clearMessage() {
         Log.d("CollectionViewModel", "Clearing message")

@@ -140,23 +140,6 @@ class PaymentRepository(private val db: FirebaseFirestore){
         return true
     }
 
-    // Update a student's object
-    suspend fun updateStudent(student: Student): Boolean {
-        return try {
-            // Only update mutable fields
-            studentsCollection.document(student.studentId.toString()).update(
-                mapOf(
-                    "currentBal" to student.currentBal,
-                    "transactionLogs" to student.transactionLogs
-                )
-            ).await()
-            true
-        } catch (e: Exception) {
-            Log.e("updateStudent", "Error updating student object", e)
-            false
-        }
-    }
-
     // Fetch the current class balance
     suspend fun getClassBalance(): Double? {
         return try {

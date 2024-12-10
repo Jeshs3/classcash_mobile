@@ -11,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.classcash.dashboardActivity.ReceiptComposable
 import com.example.classcash.viewmodels.addstudent.Student
 import com.example.classcash.viewmodels.addstudent.StudentRepository
+import com.example.classcash.viewmodels.collection.CollectionRepository
+import com.example.classcash.viewmodels.collection.Collection
 import com.example.classcash.viewmodels.payment.PaymentRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,14 +20,13 @@ import java.io.FileOutputStream
 
 class DashboardViewModel(
     private val studentRepository: StudentRepository,
-    private val paymentRepository: PaymentRepository
+    private val paymentRepository: PaymentRepository,
+    private val collectionRepository: CollectionRepository
 ) : ViewModel() {
 
-    // StateFlow for student objects, representing the UI state
     private val _studentObjects = MutableStateFlow<List<Student>>(emptyList())
     val studentObjects: StateFlow<List<Student>> = _studentObjects.asStateFlow()
 
-    // StateFlow for managing loading and error states
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState
 
@@ -35,65 +36,90 @@ class DashboardViewModel(
     private val _filteredStudents = MutableStateFlow<List<Student>>(emptyList())
     val filteredStudents: StateFlow<List<Student>> = _filteredStudents
 
+    private val _collection = MutableStateFlow<Collection?>(null)
+    val collection: StateFlow<Collection?> = _collection
+
+    private val _progress = MutableStateFlow<Map<Int, Int>>(emptyMap()) // Map<StudentId, Progress>
+    val progress: StateFlow<Map<Int, Int>> = _progress.asStateFlow()
+
     init {
+        Log.d("DashboardViewModel", "Initializing ViewModel...")
         fetchStudentObjects()
         _filteredStudents.value = _studentObjects.value
     }
 
     private fun fetchStudentObjects() {
+        Log.d("DashboardViewModel", "Fetching student objects...")
         viewModelScope.launch {
             _uiState.value = UiState.Loading
 
             studentRepository.getStudentObjectsFlow()
                 .catch { exception ->
                     _uiState.value = UiState.Error("Error fetching students: ${exception.message}")
+                    Log.e("DashboardViewModel", "Error fetching students: ${exception.message}")
                 }
                 .collect { students ->
                     _studentObjects.value = students
                     _uiState.value = UiState.Success("Students loaded successfully")
+                    Log.d("DashboardViewModel", "Fetched students: ${students.size}")
                 }
         }
     }
 
     private suspend fun fetchStudentData() {
+        Log.d("DashboardViewModel", "Fetching student data...")
         studentRepository.getStudentObjectsFlow()
             .collect { students ->
-                _studentObjects.emit(students) // Emit the collected data into the StateFlow
+                val updatedStudents = students.map { student ->
+                    val progress = if (student.targetAmt > 0) {
+                        (student.currentBal / student.targetAmt) * 100
+                    } else {
+                        0.0
+                    }
+                    student.copy(progress = progress) // Create a new Student object with updated progress
+                }
+
+                _studentObjects.emit(updatedStudents) // Emit updated data with progress
+                Log.d("DashboardViewModel", "Student data fetched and emitted: ${updatedStudents.size}")
             }
     }
 
 
     fun refreshStudentObjects() {
+        Log.d("DashboardViewModel", "Refreshing student objects...")
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
                 fetchStudentData() // Collect and emit data from the flow
                 _uiState.value = UiState.Success("Students refreshed successfully")
+                Log.d("DashboardViewModel", "Student objects refreshed successfully")
             } catch (e: Exception) {
                 _uiState.value = UiState.Error("Error refreshing students: ${e.message}")
+                Log.e("DashboardViewModel", "Error refreshing students: ${e.message}")
             }
         }
     }
 
-    ///Search students
     fun searchStudents(query: String) {
+        Log.d("DashboardViewModel", "Searching for students with query: $query")
         _searchQuery.value = query
         val filteredList = if (query.isBlank()) {
             _studentObjects.value // Show all students if the query is empty
         } else {
             _studentObjects.value.filter {
-                it.studentName.contains(query, ignoreCase = true) // Adjust `name` to the actual property name
+                it.studentName.contains(query, ignoreCase = true)
             }
         }
         _filteredStudents.value = filteredList
+        Log.d("DashboardViewModel", "Filtered students: ${filteredList.size}")
     }
 
-
-    //Download report per student as png
     fun downloadReport(context: Context, studentId: Int, callback: (Boolean, String?) -> Unit) {
+        Log.d("DashboardViewModel", "Downloading report for student ID: $studentId")
         val student = getStudentById(studentId)
         if (student == null) {
             callback(false, "Student not found")
+            Log.e("DashboardViewModel", "Student not found for ID: $studentId")
             return
         }
 
@@ -102,13 +128,15 @@ class DashboardViewModel(
 
         if (file.exists()) {
             callback(true, file.absolutePath)
+            Log.d("DashboardViewModel", "Report saved successfully at: ${file.absolutePath}")
         } else {
             callback(false, "Failed to save report")
+            Log.e("DashboardViewModel", "Failed to save report for student: ${student.studentName}")
         }
     }
 
     private fun generateReportBitmap(context: Context, student: Student): Bitmap {
-        // Create a ComposeView and attach it to a temporary FrameLayout
+        Log.d("DashboardViewModel", "Generating report bitmap for student: ${student.studentName}")
         val composeView = ComposeView(context).apply {
             setContent {
                 ReceiptComposable(
@@ -119,22 +147,20 @@ class DashboardViewModel(
             }
         }
 
-        // You can remove the manual measure/layout calls here, instead just let Compose handle it
-        val width = 1080  // Desired width
-        val height = 1920 // Desired height
+        val width = 1080
+        val height = 1920
 
-        // Create the bitmap
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        // Draw the Compose content onto the canvas (this can be done using a DrawModifier in Compose)
         composeView.draw(canvas)
 
+        Log.d("DashboardViewModel", "Report bitmap generated for student: ${student.studentName}")
         return bitmap
     }
 
-
     private fun saveBitmapAsPng(context: Context, bitmap: Bitmap, fileName: String): File {
+        Log.d("DashboardViewModel", "Saving bitmap as PNG: $fileName")
         val directory = File(context.getExternalFilesDir(null), "Reports")
         if (!directory.exists()) directory.mkdirs()
 
@@ -144,10 +170,12 @@ class DashboardViewModel(
         outputStream.flush()
         outputStream.close()
 
+        Log.d("DashboardViewModel", "File saved at: ${file.absolutePath}")
         return file
     }
 
-    // Helper functions to manage UI state
+
+
     sealed class UiState {
         object Idle : UiState()
         object Loading : UiState()
@@ -155,7 +183,6 @@ class DashboardViewModel(
         data class Error(val message: String) : UiState()
     }
 
-    // If needed, expose the current list directly
     fun getStudentObjects(): List<Student> = _studentObjects.value
 
     fun getStudentById(studentId: Int): Student? {
@@ -168,7 +195,4 @@ class DashboardViewModel(
         }
         return student
     }
-
-
 }
-

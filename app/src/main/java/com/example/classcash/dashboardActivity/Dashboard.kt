@@ -67,6 +67,7 @@ fun DashboardScreen(
                 navController,
                 collectionViewModel,
                 paymentViewModel,
+                dashboardViewModel,
                 addStudentViewModel
                 )
 
@@ -117,7 +118,10 @@ fun DashboardScreen(
 
             StudentsList(
                 navController,
-                dashboardViewModel
+                dashboardViewModel,
+                paymentViewModel,
+                collectionViewModel,
+                addStudentViewModel
             )
 
         Spacer(modifier = Modifier.height(140.dp))
@@ -163,6 +167,7 @@ fun BalanceBox(
     navController: NavController,
     collectionViewModel : CollectionViewModel,
     paymentViewModel : PaymentViewModel,
+    dashboardViewModel: DashboardViewModel,
     addStudentViewModel : AddStudentViewModel
 ) {
 
@@ -283,7 +288,10 @@ fun BalanceBox(
 @Composable
 fun StudentsList(
     navController: NavController,
-    dashboardViewModel: DashboardViewModel
+    dashboardViewModel: DashboardViewModel,
+    paymentViewModel : PaymentViewModel,
+    collectionViewModel : CollectionViewModel,
+    addStudentViewModel: AddStudentViewModel
 ) {
 
     // Collect the student objects as state from the DashboardViewModel
@@ -292,6 +300,7 @@ fun StudentsList(
     LaunchedEffect(Unit) {
         // Trigger the fetch operation once when the composable is first launched
         dashboardViewModel.refreshStudentObjects()
+
     }
 
 
@@ -314,7 +323,7 @@ fun StudentsList(
         } else {
             items(students) { student ->
                 // Calculating progress and current balance for each student
-                val progress = student.calculateProgress()
+                val progress = student.progress
                 val amount = student.currentBal
 
                 // Format the balance for display
@@ -343,7 +352,7 @@ fun StudentsList(
                         Canvas(
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            val progress = 0.75f // Replace with actual progress (0.0f to 1.0f)
+                            val progressFloat = progress.toFloat() / 100f // Convert percentage to float (0.0f to 1.0f)
                             val strokeWidth = 8.dp.toPx()
 
                             drawCircle(
@@ -353,13 +362,13 @@ fun StudentsList(
                             drawArc(
                                 color = Color.Blue,
                                 startAngle = -90f,
-                                sweepAngle = 360 * progress,
+                                sweepAngle = 360f * progressFloat,
                                 useCenter = false,
                                 style = Stroke(width = strokeWidth)
                             )
                         }
                         Text(
-                            text = "100%", // "${(progress * 100).toInt()}%",
+                            text = "${progress}%",
                             fontSize = 12.sp,
                             fontFamily = FontFamily(Font(R.font.montserrat)),
                             modifier = Modifier.align(Alignment.Center)

@@ -28,6 +28,7 @@ import androidx.navigation.NavController
 import com.example.classcash.R
 import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.collection.CollectionViewModel
+import com.example.classcash.viewmodels.dashboard.DashboardViewModel
 import java.util.Calendar
 
 
@@ -35,7 +36,8 @@ import java.util.Calendar
 fun FundSetting(
     navController: NavController,
     topScreenViewModel: TopScreenViewModel,
-    collectionViewModel: CollectionViewModel
+    collectionViewModel: CollectionViewModel,
+    dashboardViewModel : DashboardViewModel
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
@@ -86,7 +88,6 @@ fun FundSetting(
                 onValueChange = {
                     duration = it.filter { char -> char.isDigit() }
                     collectionViewModel.updateDuration(duration)
-                    collectionViewModel.saveCollection()
                 },
                 onEditToggle = { isEditingDuration = it },
                 displayValue = if (duration.isNotEmpty()) "Duration: $duration MONTHS" else "Duration: Not Set"
@@ -99,7 +100,6 @@ fun FundSetting(
                 onValueChange = {
                     dailyFund = it.filter { char -> char.isDigit() }
                     collectionViewModel.updateDailyFund(dailyFund)
-                    collectionViewModel.saveCollection()
                 },
                 onEditToggle = { isEditingDailyFund = it },
                 displayValue = if (dailyFund.isNotEmpty()) {
@@ -376,7 +376,6 @@ fun MonthSelectionBox(
                                 selectedMonth = month
                                 selectedDays = collectionViewModel.getActiveDaysForMonth(month) ?: emptyList()
                                 collectionViewModel.updateSelectedMonth(month, selectedDays)
-                                collectionViewModel.saveCollection()
                             }
                         )
                     }
@@ -459,10 +458,6 @@ fun MonthDetails(
     onAddActiveDay: (List<String>) -> Unit
 ) {
     val monthDetails by collectionViewModel.monthDetails.observeAsState()
-
-    LaunchedEffect(Unit) {
-        collectionViewModel.fetchCollectionSettings()
-    }
 
     // If no month is selected, show a message and return
     if (selectedMonth == null) {

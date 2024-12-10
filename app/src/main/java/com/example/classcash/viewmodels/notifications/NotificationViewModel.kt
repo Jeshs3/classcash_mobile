@@ -1,6 +1,6 @@
 package com.example.classcash.viewmodels.notifications
 
-import Notification
+/*import Notification
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -66,3 +66,4 @@ class NotificationsViewModel(
         }
     }
 }
+*/

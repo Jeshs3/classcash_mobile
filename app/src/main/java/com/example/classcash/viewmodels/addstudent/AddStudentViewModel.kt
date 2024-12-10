@@ -2,6 +2,9 @@ package com.example.classcash.viewmodels.addstudent
 
 import android.util.Log
 import androidx.lifecycle.*
+import com.example.classcash.viewmodels.collection.CollectionRepository
+import com.example.classcash.viewmodels.collection.Collection
+import com.example.classcash.viewmodels.dashboard.DashboardViewModel
 import com.example.classcash.viewmodels.payment.PaymentRepository
 import com.opencsv.CSVReader
 import kotlinx.coroutines.flow.*
@@ -9,8 +12,10 @@ import kotlinx.coroutines.launch
 import java.io.FileReader
 
 class AddStudentViewModel(
-    private val repository: StudentRepository,
-    private val paymentRepository: PaymentRepository
+    private val studentRepository: StudentRepository,
+    private val paymentRepository: PaymentRepository,
+    private val collectionRepository: CollectionRepository,
+    private val dashboardViewModel: DashboardViewModel
 ) : ViewModel() {
 
     sealed class UiState {
@@ -21,6 +26,12 @@ class AddStudentViewModel(
     }
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState
+
+    private val _collection = MutableLiveData<Collection>()
+    val collection: LiveData<Collection> get() = _collection
+
+    private val _studentObjects = MutableStateFlow<List<Student>>(emptyList())
+    val studentObjects: StateFlow<List<Student>> = _studentObjects.asStateFlow()
 
     private val _studentNames = MutableStateFlow<List<String>>(listOf())
     val studentNames: StateFlow<List<String>> = _studentNames
@@ -34,48 +45,52 @@ class AddStudentViewModel(
     private val _classBalance = MutableStateFlow(0.0)
     val classBalance: StateFlow<Double> = _classBalance
 
+    val monthlyFund: MediatorLiveData<Double> = MediatorLiveData()
+    private var isMonthlyFundObserverAdded = false
+
     init {
         fetchStudentNames()
     }
 
-    fun updateStudentName(studentId: Int, newName: String) {
-        _studentNames.value = _studentNames.value.mapIndexed { i, name ->
-            if (i == studentId) newName else name
-        }
-    }
-
     fun addStudent(studentName: String) {
-        if (studentName.isBlank()) return
-        if (_studentNames.value.contains(studentName)) {
+        if (studentName.isBlank()) {
+            _uiState.value = UiState.Error("Student name cannot be blank")
+            return
+        }
+        if (_studentObjects.value.any { it.studentName == studentName }) {
             _uiState.value = UiState.Error("Duplicate student name")
             return
         }
 
-        performActionWithUiState {
-            val newStudentId = generateNewStudentId()
-            val newStudent = StudentWarehouse.createStudent(
-                studentId = newStudentId,
-                studentName = studentName
-            )
-            val result = repository.saveStudent(newStudent)
-            if (result.isSuccess) {
-                _studentNames.value = (_studentNames.value + studentName).distinct()
-                updateClassSize()
-                UiState.Success("$studentName added successfully")
-            } else {
-                UiState.Error("Failed to add student: ${result.exceptionOrNull()?.message}")
+        _uiState.value = UiState.Loading
+
+        val newStudentId = generateNewStudentId()
+        val newStudent = Student(
+            studentId = newStudentId,
+            studentName = studentName,
+            currentBal = 0.0,
+            targetAmt = 0.0 // Temporary value, will be updated later
+        )
+
+        viewModelScope.launch {
+            try {
+                studentRepository.saveStudent(newStudent) // Save the new student
+                _studentObjects.value = _studentObjects.value + newStudent
+
+
+                _uiState.value = UiState.Success("$studentName added successfully")
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error("Error adding student: ${e.message}")
             }
         }
     }
 
+
+
+
     fun updateClassSize() {
         _classSize.value = _studentNames.value.distinct().count { it.isNotBlank() }
         Log.d("AddStudentViewModel", "Class size updated: ${_classSize.value}")
-    }
-
-    fun clearStudentName() {
-        _studentNames.value = listOf() // Reset the list of student names
-        updateClassSize()  // Reset class size as well
     }
 
     fun clearInputFields() {
@@ -89,28 +104,45 @@ class AddStudentViewModel(
         _inputState.value = input
     }
 
+    fun saveAll(selectedMonth: String) {
+        if (_studentNames.value.isEmpty()) {
+            _uiState.value = UiState.Error("No students to save")
+            return
+        }
 
-    fun saveAll() {
-        if (_studentNames.value.isEmpty()) return
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
 
-        performActionWithUiState {
-            val students = _studentNames.value
-                .filter { it.isNotBlank() }
-                .distinct()
-                .mapIndexed { index, name ->
-                    Student(
-                        studentId = index + 1,// Generate student ID as a string
-                        studentName = name
-                    )
+            try {
+                val monthlyFundValue = collectionRepository.getMonthlyFund(selectedMonth)
+                if (monthlyFundValue <= 0) {
+                    _uiState.value = UiState.Error("Invalid monthly fund value")
+                    return@launch
                 }
-            Log.d("AddStudentViewModel", "Saving all students: $students")
 
-            val result = repository.saveStudentsBatch(students)
+                // Prepare student objects
+                val students = _studentNames.value
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .mapIndexed { index, name ->
+                        Student(
+                            studentId = index + 1,
+                            studentName = name,
+                            targetAmt = monthlyFundValue
+                        )
+                    }
 
-            if (result.isSuccess) {
-                UiState.Success("All students added successfully")
-            } else {
-                UiState.Error("Failed to add students: ${result.exceptionOrNull()?.message}")
+                // Save students in batch
+                val result = studentRepository.saveStudentsBatch(students)
+                if (result.isSuccess) {
+                    _uiState.value = UiState.Success("All students added and updated successfully")
+                    Log.d("AddStudentViewModel", "Students successfully saved")
+                } else {
+                    throw result.exceptionOrNull() ?: IllegalArgumentException("Unknown error occurred")
+                }
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error("Failed to save students: ${e.message}")
+                Log.e("AddStudentViewModel", "Error saving students", e)
             }
         }
     }
@@ -121,17 +153,9 @@ class AddStudentViewModel(
         updateClassSize()
     }
 
-    fun addNewStudent() {
-        _studentNames.value = _studentNames.value + "" // Add an empty string (a new student entry)
-    }
-
-    fun updateInputState(newValue: String) {
-        _inputState.value = newValue
-    }
-
     fun deleteClass(clearFields: Boolean = true) {
         performActionWithUiState {
-            val result = repository.deleteAllStudents()
+            val result = studentRepository.deleteAllStudents()
             if (result.isSuccess) {
                 if (clearFields) _studentNames.value = listOf()
                 updateClassSize()
@@ -174,7 +198,7 @@ class AddStudentViewModel(
     }
     private fun fetchStudentNames() {
         viewModelScope.launch {
-            repository.fetchStudentNames()
+            studentRepository.fetchStudentNames()
                 .catch { exception ->
                     _uiState.value = UiState.Error("Failed to fetch student names: ${exception.message}")
                 }

@@ -13,18 +13,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.example.classcash.R
-import com.example.classcash.viewmodels.notifications.NotificationsViewModel
+//import com.example.classcash.viewmodels.notifications. NotificationsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun Notifications(
-    navController: NavController,
-    notificationsViewModel:  NotificationsViewModel
+    navController: NavController
 ) {
     // Observe notifications from ViewModel
-    val notifications = notificationsViewModel.notifications.observeAsState(emptyList())
+    //val notifications = notificationsViewModel.notifications.observeAsState(emptyList())
 
     val currentDate = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
 
@@ -57,7 +56,7 @@ fun Notifications(
                     fontFamily = FontFamily(Font(R.font.montserrat))
                 )
 
-                if (notifications.value.isEmpty()) {
+                /*if (notifications.value.isEmpty()) {
                     Text(
                         text = "No notifications",
                         fontFamily = FontFamily(Font(R.font.montserrat))
@@ -69,7 +68,7 @@ fun Notifications(
                             fontFamily = FontFamily(Font(R.font.montserrat))
                         )
                     }
-                }
+                }*/
             }
         }
     }

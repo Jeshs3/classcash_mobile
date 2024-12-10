@@ -1,19 +1,25 @@
 package com.example.classcash.viewmodels.addstudent
 
+import com.example.classcash.viewmodels.collection.Collection
+
 object StudentWarehouse {
     fun createStudent(
         studentId: Int,
         studentName: String,
-        targetAmt: Double = 0.0,
-        currentBal: Double = 0.0 // Added current balance
+        collection: Collection, // Ensure correct type
+        currentBal: Double = 0.0,
+        progress : Double = 0.0
     ): Student {
+        val monthlyFund = collection.calculateMonthlyFund()
         return Student(
             studentId = studentId,
             studentName = studentName,
-            targetAmt = targetAmt,
-            currentBal = currentBal, // Set the balance from input
-            transactionLogs = mutableListOf() // Empty logs
+            targetAmt = monthlyFund, // Uses calculated monthly fund
+            currentBal = currentBal,
+            transactionLogs = mutableListOf() // Empty transaction logs
         )
     }
 }
+
+
 

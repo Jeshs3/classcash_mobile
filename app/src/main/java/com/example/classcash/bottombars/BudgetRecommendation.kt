@@ -28,7 +28,6 @@ fun Budget(
 ) {
 
 
-
     Column(
         modifier = Modifier
             .fillMaxHeight()

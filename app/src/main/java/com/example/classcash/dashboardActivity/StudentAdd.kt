@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
@@ -24,12 +25,14 @@ import com.example.classcash.R
 import com.example.classcash.viewmodels.addstudent.AddStudentViewModel
 import com.example.classcash.viewmodels.TopScreenViewModel
 import com.example.classcash.viewmodels.addstudent.StudentRepository
+import com.example.classcash.viewmodels.collection.CollectionViewModel
 
 @Composable
 fun AddStudentScreen(
     navController : NavController,
     topScreenViewModel: TopScreenViewModel,
     addStudentViewModel : AddStudentViewModel,
+    collectionViewModel : CollectionViewModel,
     studentRepository: StudentRepository
 ) {
 
@@ -37,6 +40,8 @@ fun AddStudentScreen(
     val uiState by addStudentViewModel.uiState.collectAsState()
     val studentNames by addStudentViewModel.studentNames.collectAsState(initial = emptyList())
     val inputState by addStudentViewModel.inputState.collectAsState("")
+    val monthlyFund by collectionViewModel.monthlyFund.observeAsState()
+
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -177,7 +182,8 @@ fun AddStudentScreen(
         // Save Button
         Button(
             onClick = {
-                addStudentViewModel.saveAll()
+                val selectedMonth = monthlyFund?.toString() ?: "defaultMonth"
+                addStudentViewModel.saveAll(selectedMonth)
                 Toast.makeText(context, "Students Saved", Toast.LENGTH_SHORT).show()
                 navController.popBackStack()
                 addStudentViewModel.clearInputFields()

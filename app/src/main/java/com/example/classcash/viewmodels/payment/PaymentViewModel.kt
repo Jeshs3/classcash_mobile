@@ -2,14 +2,20 @@ package com.example.classcash.viewmodels.payment
 
 import android.util.Log
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.classcash.viewmodels.addstudent.Student
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 
 
-class PaymentViewModel(private val paymentRepository: PaymentRepository) : ViewModel() {
+class PaymentViewModel(
+    private val paymentRepository: PaymentRepository,
+    private val sharedRepository: SharedRepository
+) : ViewModel() {
 
     // LiveData for observing the current student's balance
     private val _studentBalance = MutableLiveData<Double>()
@@ -26,9 +32,24 @@ class PaymentViewModel(private val paymentRepository: PaymentRepository) : ViewM
 
     private val studentCache = mutableMapOf<Int, Student>()
 
+    private val _paymentStatus = MutableSharedFlow<Boolean>(replay = 0) // Event when payment is done
+    val paymentEvent = _paymentStatus.asSharedFlow()
+
+    private var dailyFund: Double = 0.0
+    private var activeDays: List<String> = emptyList()
+
+    private val _targetAmt = MediatorLiveData<Double>()
+    val targetAmt: LiveData<Double> get() = sharedRepository.targetAmt
+
     // Initialize the balances when the ViewModel is created
     init {
         fetchClassBalance()
+    }
+
+    private fun updateTargetAmt(activeDays: List<String>?, dailyFund: Double?) {
+        if (activeDays != null && dailyFund != null && dailyFund > 0) {
+            _targetAmt.value = activeDays.size * dailyFund
+        }
     }
 
     // Fetch the current class balance from the repository
@@ -93,14 +114,19 @@ class PaymentViewModel(private val paymentRepository: PaymentRepository) : ViewM
                     Log.d("recordPay", "New balance for student ${student.studentId}: ${student.currentBal}")
                     _studentBalance.value = student.currentBal
                     student.transactionLogs += updatedTransaction
-                    updateStudentObject { success ->
-                        Log.d("recordPay", "Update student result: $success")
-                    }
+                    _studentBalance.postValue(student.currentBal)
+                    _studentData.postValue(student)
                     updateClassBalance(amount)
+
+                    // Emit success signal after payment is recorded
+                    _paymentStatus.emit(true)
+                } else {
+                    _paymentStatus.emit(false) // Emit failure if result is false
                 }
                 onResult(result)
             } catch (e: Exception) {
                 Log.e("recordPay", "Error recording payment for studentId=${student.studentId}", e)
+                _paymentStatus.emit(false) // Emit failure on exception
                 onResult(false)
             }
         }
@@ -152,19 +178,6 @@ class PaymentViewModel(private val paymentRepository: PaymentRepository) : ViewM
         }
     }
 
-
-
-    // Update the stored student data
-    fun updateStudentObject(onResult: (Boolean) -> Unit) {
-        currentStudent?.let { student ->
-            Log.d("updateStudentObject", "Updating student ${student.studentId}")
-            viewModelScope.launch {
-                val result = paymentRepository.updateStudent(student)
-                Log.d("updateStudentObject", "Student update result: $result")
-                onResult(result)
-            }
-        } ?: onResult(false)
-    }
 
     // Helper Function 1: Validate payment amount
     fun validatePay(amount: Double): Boolean {
